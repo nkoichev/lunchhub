@@ -55,26 +55,30 @@ create table if not exists public.order_items (
 create index if not exists order_items_order_idx on public.order_items(order_id);
 
 -- ---------- RATINGS ----------
--- One rating per user per dish name (upsert to update).
+-- One rating per user per dish name per restaurant (upsert to update).
+-- Scoped by restaurant because the same dish name can exist at different
+-- restaurants, prepared differently, and rates independently.
 create table if not exists public.ratings (
-  id         uuid primary key default gen_random_uuid(),
-  user_id    uuid not null references public.users(id) on delete cascade,
-  item_name  text not null,
-  stars      int  not null check (stars between 1 and 5),
-  comment    text,
-  created_at timestamptz not null default now(),
-  unique (user_id, item_name)
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references public.users(id) on delete cascade,
+  restaurant_id  text not null references public.restaurants(id) on delete cascade,
+  item_name      text not null,
+  stars          int  not null check (stars between 1 and 5),
+  comment        text,
+  created_at     timestamptz not null default now(),
+  unique (user_id, restaurant_id, item_name)
 );
-create index if not exists ratings_item_idx on public.ratings(item_name);
+create index if not exists ratings_restaurant_item_idx on public.ratings(restaurant_id, item_name);
 
--- ---------- AGGREGATE VIEW: average rating per dish ----------
+-- ---------- AGGREGATE VIEW: average rating per dish, per restaurant ----------
 create or replace view public.rating_summary as
 select
+  restaurant_id,
   item_name,
   round(avg(stars)::numeric, 1) as avg_stars,
   count(*)                      as votes
 from public.ratings
-group by item_name;
+group by restaurant_id, item_name;
 
 -- ---------- TODAY'S SUMMARY VIEW: who ordered what today ----------
 create or replace view public.today_orders as

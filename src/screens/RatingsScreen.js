@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { fetchHistory } from '../services/orderService';
 import { fetchMyRatings, rateDish, fetchTopRated } from '../services/ratingService';
 import { useAuth } from '../context/AuthContext';
+import { useRestaurant } from '../context/RestaurantContext';
 import { StarRating, EmptyState, Badge } from '../components/ui';
 import RatingDetailsModal from '../components/RatingDetailsModal';
 import { useResponsive } from '../hooks/useResponsive';
@@ -11,6 +12,7 @@ import { colors, spacing, radius, font, shadow } from '../theme/theme';
 
 export default function RatingsScreen() {
   const { user } = useAuth();
+  const { restaurants, selected, setSelected } = useRestaurant();
   const { readWidth } = useResponsive();
   const [dishes, setDishes] = useState([]);
   const [myRatings, setMyRatings] = useState({});
@@ -20,23 +22,34 @@ export default function RatingsScreen() {
   const [detailsDish, setDetailsDish] = useState(null);
 
   const load = useCallback(async () => {
+    if (!selected) {
+      setDishes([]);
+      setMyRatings({});
+      setTopRated([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
       const [history, mine, top] = await Promise.all([
         fetchHistory(user),
-        fetchMyRatings(user),
-        fetchTopRated(10),
+        fetchMyRatings(user, selected.id),
+        fetchTopRated(selected.id, 10),
       ]);
-      // Unique dishes this user has actually ordered.
+      // Unique dishes this user has ordered from THIS restaurant — ratings
+      // don't carry over between restaurants even for a same-named dish.
       const seen = new Set();
       const ordered = [];
-      history.forEach((o) =>
-        o.items.forEach((it) => {
-          if (!seen.has(it.item_name)) {
-            seen.add(it.item_name);
-            ordered.push(it.item_name);
-          }
-        })
-      );
+      history
+        .filter((o) => o.restaurant_id === selected.id)
+        .forEach((o) =>
+          o.items.forEach((it) => {
+            if (!seen.has(it.item_name)) {
+              seen.add(it.item_name);
+              ordered.push(it.item_name);
+            }
+          })
+        );
       setDishes(ordered);
       setMyRatings(mine);
       setTopRated(top);
@@ -46,7 +59,7 @@ export default function RatingsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user]);
+  }, [user, selected]);
 
   useFocusEffect(
     useCallback(() => {
@@ -59,7 +72,7 @@ export default function RatingsScreen() {
     // Optimistic update
     setMyRatings((prev) => ({ ...prev, [dish]: { stars } }));
     try {
-      await rateDish(user, dish, stars);
+      await rateDish(user, selected.id, dish, stars);
       load();
     } catch (e) {
       Alert.alert('Грешка', e.message);
@@ -76,16 +89,37 @@ export default function RatingsScreen() {
 
   return (
     <>
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor={colors.primary} />}
-    >
+    <View style={styles.screen}>
+      {restaurants.length > 1 && (
+        <View style={styles.barWrap}>
+          <View style={[styles.restaurantBar, { maxWidth: readWidth, alignSelf: 'center', width: '100%' }]}>
+            {restaurants.map((r) => {
+              const active = r.id === selected?.id;
+              return (
+                <TouchableOpacity
+                  key={r.id}
+                  onPress={() => setSelected(r)}
+                  style={[styles.restChip, active && styles.restChipActive]}
+                >
+                  <Text numberOfLines={1} style={[styles.restChipText, active && styles.restChipTextActive]}>
+                    {r.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor={colors.primary} />}
+      >
       <View style={{ width: '100%', maxWidth: readWidth, alignSelf: 'center' }}>
       {/* Team top-rated */}
       {topRated.length > 0 && (
         <>
-          <Text style={styles.sectionTitle}>🏆 Топ ястия на екипа</Text>
+          <Text style={styles.sectionTitle}>🏆 Топ ястия · {selected?.name}</Text>
           {topRated.map((t, i) => (
             <TouchableOpacity
               key={t.item_name}
@@ -108,7 +142,7 @@ export default function RatingsScreen() {
         <EmptyState
           emoji="⭐"
           title="Още няма какво да оцените"
-          subtitle="Направете поръчка, за да можете да оценявате ястията."
+          subtitle="Направете поръчка от този ресторант, за да можете да оценявате ястията."
         />
       ) : (
         dishes.map((dish) => {
@@ -131,10 +165,12 @@ export default function RatingsScreen() {
         })
       )}
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
     <RatingDetailsModal
       visible={!!detailsDish}
       itemName={detailsDish}
+      restaurantId={selected?.id}
       user={user}
       onClose={() => setDetailsDish(null)}
       onChanged={load}
@@ -144,9 +180,36 @@ export default function RatingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
+  barWrap: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+  },
+  restaurantBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  restChip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    marginRight: spacing.sm,
+    marginBottom: spacing.sm,
+    flexShrink: 0,
+  },
+  restChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  restChipText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.textMuted },
+  restChipTextActive: { color: colors.onPrimary },
   sectionTitle: {
     fontSize: font.md,
     fontWeight: font.bold,

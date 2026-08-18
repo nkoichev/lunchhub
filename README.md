@@ -41,6 +41,7 @@ The original app read from Google Sheets via an Apps Script — fragile, hard to
 2. Open **SQL Editor** and run the contents of [`supabase/schema.sql`](supabase/schema.sql).
 3. Then run [`supabase/seed.sql`](supabase/seed.sql) to load the Малка Верея menu.
 4. **If you already ran an older `schema.sql`** (before multi-restaurant support), also run [`supabase/migration_multi_restaurant.sql`](supabase/migration_multi_restaurant.sql) once.
+5. **If you already ran an older `schema.sql`** (before ratings were scoped per restaurant), also run [`supabase/migration_ratings_per_restaurant.sql`](supabase/migration_ratings_per_restaurant.sql) once.
 
 **Adding more restaurants:** copy [`supabase/add_restaurant_template.sql`](supabase/add_restaurant_template.sql), fill in the restaurant name and its dishes, and run it. The new restaurant's button appears in the app automatically (pull to refresh). No rebuild needed.
 

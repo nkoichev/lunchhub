@@ -23,10 +23,12 @@ export async function fetchMenu(restaurantId, dayIndex) {
 
   if (error) throw new Error(error.message);
 
-  // Pull rating averages and merge by dish name.
+  // Pull rating averages for this restaurant and merge by dish name — the
+  // same dish name can exist at a different restaurant with its own ratings.
   const { data: ratings } = await supabase
     .from('rating_summary')
-    .select('item_name, avg_stars, votes');
+    .select('item_name, avg_stars, votes')
+    .eq('restaurant_id', rid);
 
   const ratingMap = {};
   (ratings || []).forEach((r) => {

@@ -145,7 +145,7 @@ export async function fetchHistory(user) {
 
   const { data: orders, error } = await supabase
     .from('orders')
-    .select('id, order_date, total, restaurant_name, created_at')
+    .select('id, order_date, total, restaurant_id, restaurant_name, created_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(60);

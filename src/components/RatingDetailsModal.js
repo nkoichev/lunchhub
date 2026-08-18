@@ -12,23 +12,23 @@ function formatDate(dateStr) {
 
 // Shows everyone who rated a dish (name, stars, date). If the current user
 // is among them, lets them edit their own rating right here.
-export default function RatingDetailsModal({ visible, itemName, user, onClose, onChanged }) {
+export default function RatingDetailsModal({ visible, itemName, restaurantId, user, onClose, onChanged }) {
   const [raters, setRaters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    if (!itemName) return;
+    if (!itemName || !restaurantId) return;
     setLoading(true);
     try {
-      const data = await fetchRatersForDish(itemName);
+      const data = await fetchRatersForDish(restaurantId, itemName);
       setRaters(data);
     } catch (e) {
       alertMessage('Грешка', e.message);
     } finally {
       setLoading(false);
     }
-  }, [itemName]);
+  }, [itemName, restaurantId]);
 
   useEffect(() => {
     if (visible) load();
@@ -37,7 +37,7 @@ export default function RatingDetailsModal({ visible, itemName, user, onClose, o
   const onEditMine = async (stars) => {
     setSaving(true);
     try {
-      await rateDish(user, itemName, stars);
+      await rateDish(user, restaurantId, itemName, stars);
       await load();
       onChanged?.();
     } catch (e) {
