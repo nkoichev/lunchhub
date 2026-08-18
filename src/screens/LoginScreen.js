@@ -84,6 +84,7 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     padding: spacing.xl,
   },
   logoWrap: {
@@ -111,6 +112,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xxl,
   },
   formCard: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: spacing.xl,
@@ -142,6 +146,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   warn: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
     marginTop: spacing.xl,
     backgroundColor: '#FDF3E0',
     borderRadius: radius.md,
