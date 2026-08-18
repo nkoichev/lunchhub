@@ -1,7 +1,7 @@
 -- Auto-generated menu seed for LunchHub
 -- Run AFTER schema.sql
 
-insert into public.restaurants (id, name) values ('malkata-vereya', 'Малката Вереа')
+insert into public.restaurants (id, name) values ('malkata-vereya', 'Малката Верея')
   on conflict (id) do update set name = excluded.name;
 
 -- Clear existing menu for a clean reseed
