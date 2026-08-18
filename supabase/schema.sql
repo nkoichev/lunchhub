@@ -77,7 +77,11 @@ create table if not exists public.ratings (
 create index if not exists ratings_restaurant_item_idx on public.ratings(restaurant_id, item_name);
 
 -- ---------- AGGREGATE VIEW: average rating per dish, per restaurant ----------
-create or replace view public.rating_summary as
+-- security_invoker: the view runs with the QUERYING role's privileges (and
+-- RLS) instead of the view owner's — otherwise a view silently bypasses any
+-- RLS policy on its underlying tables, even ones added later.
+create or replace view public.rating_summary
+with (security_invoker = on) as
 select
   restaurant_id,
   item_name,
@@ -87,7 +91,8 @@ from public.ratings
 group by restaurant_id, item_name;
 
 -- ---------- TODAY'S SUMMARY VIEW: who ordered what today ----------
-create or replace view public.today_orders as
+create or replace view public.today_orders
+with (security_invoker = on) as
 select
   o.id              as order_id,
   o.user_id         as user_id,
