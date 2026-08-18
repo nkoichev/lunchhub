@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { fetchRatersForDish, rateDish } from '../services/ratingService';
 import { alertMessage } from '../utils/confirm';
 import { StarRating, Badge } from './ui';
-import { colors, spacing, radius, font, shadow } from '../theme/theme';
+import { useTheme } from '../context/ThemeContext';
+import { spacing, radius, font } from '../theme/theme';
 
 function formatDate(dateStr) {
   const d = new Date(dateStr);
@@ -13,6 +14,8 @@ function formatDate(dateStr) {
 // Shows everyone who rated a dish (name, stars, date). If the current user
 // is among them, lets them edit their own rating right here.
 export default function RatingDetailsModal({ visible, itemName, restaurantId, user, onClose, onChanged }) {
+  const { colors, shadow } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [raters, setRaters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -97,7 +100,7 @@ export default function RatingDetailsModal({ visible, itemName, restaurantId, us
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: colors.surface,

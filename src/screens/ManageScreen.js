@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRestaurant } from '../context/RestaurantContext';
+import { useTheme } from '../context/ThemeContext';
 import {
   fetchDishes,
   addDish,
@@ -27,10 +28,12 @@ import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { isSupabaseConfigured } from '../config/supabase';
 import { WEEKDAYS, dayName, CATEGORY_LABELS } from '../data/menu';
-import { colors, spacing, radius, font, shadow, CURRENCY } from '../theme/theme';
+import { spacing, radius, font, CURRENCY } from '../theme/theme';
 
 export default function ManageScreen() {
   const { restaurants, selected, setSelected, reload } = useRestaurant();
+  const { colors, shadow } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { columns, maxWidth } = useResponsive();
   const [dishes, setDishes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -267,7 +270,7 @@ export default function ManageScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   barWrap: {

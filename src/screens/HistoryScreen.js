@@ -3,10 +3,11 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, 
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchAllHistory, deleteOrder } from '../services/orderService';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { EmptyState } from '../components/ui';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
-import { colors, spacing, radius, font, shadow, CURRENCY } from '../theme/theme';
+import { spacing, radius, font, CURRENCY } from '../theme/theme';
 
 function formatDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -15,6 +16,8 @@ function formatDate(dateStr) {
 
 export default function HistoryScreen({ navigation }) {
   const { user } = useAuth();
+  const { colors, shadow } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { readWidth } = useResponsive();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -231,7 +234,7 @@ export default function HistoryScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },

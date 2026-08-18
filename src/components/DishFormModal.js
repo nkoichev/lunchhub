@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -11,11 +11,14 @@ import {
   ScrollView,
 } from 'react-native';
 import { Button } from './ui';
+import { useTheme } from '../context/ThemeContext';
 import { FORM_DAYS, dayName, CATEGORY_LABELS, CATEGORY_ORDER } from '../data/menu';
-import { colors, spacing, radius, font, shadow } from '../theme/theme';
+import { spacing, radius, font } from '../theme/theme';
 
 // dish === null -> add mode; otherwise edit mode.
 export default function DishFormModal({ visible, dish, defaultDay, onClose, onSave }) {
+  const { colors, shadow } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [day, setDay] = useState(0);
@@ -125,7 +128,7 @@ export default function DishFormModal({ visible, dish, defaultDay, onClose, onSa
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: colors.surface,

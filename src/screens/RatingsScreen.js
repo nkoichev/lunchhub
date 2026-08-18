@@ -1,18 +1,21 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchHistory } from '../services/orderService';
 import { fetchMyRatings, rateDish, fetchTopRated } from '../services/ratingService';
 import { useAuth } from '../context/AuthContext';
 import { useRestaurant } from '../context/RestaurantContext';
+import { useTheme } from '../context/ThemeContext';
 import { StarRating, EmptyState, Badge } from '../components/ui';
 import RatingDetailsModal from '../components/RatingDetailsModal';
 import { useResponsive } from '../hooks/useResponsive';
-import { colors, spacing, radius, font, shadow } from '../theme/theme';
+import { spacing, radius, font } from '../theme/theme';
 
 export default function RatingsScreen() {
   const { user } = useAuth();
   const { restaurants, selected, setSelected } = useRestaurant();
+  const { colors, shadow } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { readWidth } = useResponsive();
   const [dishes, setDishes] = useState([]);
   const [myRatings, setMyRatings] = useState({});
@@ -179,7 +182,7 @@ export default function RatingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },

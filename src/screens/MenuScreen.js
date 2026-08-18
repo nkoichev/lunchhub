@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useCart } from '../context/CartContext';
 import { useRestaurant } from '../context/RestaurantContext';
+import { useTheme } from '../context/ThemeContext';
 import { fetchMenu } from '../services/menuService';
 import { confirmDialog } from '../utils/confirm';
 import { StarRating, EmptyState } from '../components/ui';
@@ -21,11 +22,13 @@ import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
 } from '../data/menu';
-import { colors, spacing, radius, font, shadow, CURRENCY } from '../theme/theme';
+import { spacing, radius, font, CURRENCY } from '../theme/theme';
 
 export default function MenuScreen({ navigation }) {
   const { qtyOf, add, decrement, count, total, clear, list } = useCart();
   const { restaurants, selected, setSelected } = useRestaurant();
+  const { colors, shadow } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { columns, maxWidth, isWide } = useResponsive();
   const [day, setDay] = useState(() => {
     const t = todayIndex();
@@ -226,7 +229,7 @@ export default function MenuScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   barWrap: {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,15 @@ import {
 } from 'react-native';
 import { fetchOrder, updateOrder, deleteOrder } from '../services/orderService';
 import { Button, EmptyState } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
-import { colors, spacing, radius, font, shadow, CURRENCY } from '../theme/theme';
+import { spacing, radius, font, CURRENCY } from '../theme/theme';
 
 export default function EditOrderScreen({ route, navigation }) {
   const { orderId } = route.params;
+  const { colors, shadow } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { readWidth } = useResponsive();
   const [items, setItems] = useState([]);
   const [restaurantName, setRestaurantName] = useState(null);
@@ -173,7 +176,7 @@ export default function EditOrderScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   list: { padding: spacing.lg, paddingBottom: spacing.xl },

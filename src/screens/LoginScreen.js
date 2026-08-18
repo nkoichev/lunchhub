@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,16 @@ import {
   ScrollView,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/ui';
 import { alertMessage } from '../utils/confirm';
-import { colors, spacing, radius, font, shadow } from '../theme/theme';
+import { spacing, radius, font } from '../theme/theme';
 import { isSupabaseConfigured } from '../config/supabase';
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { colors, shadow } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -80,7 +83,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: {
     flexGrow: 1,
     justifyContent: 'center',

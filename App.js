@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { CartProvider, useCart } from './src/context/CartContext';
 import { RestaurantProvider } from './src/context/RestaurantContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import AppHeader from './src/components/AppHeader';
 
 import LoginScreen from './src/screens/LoginScreen';
@@ -20,7 +21,7 @@ import RatingsScreen from './src/screens/RatingsScreen';
 import EditOrderScreen from './src/screens/EditOrderScreen';
 import ManageScreen from './src/screens/ManageScreen';
 
-import { colors, font } from './src/theme/theme';
+import { font } from './src/theme/theme';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -43,6 +44,7 @@ function TabIcon({ route, focused }) {
 
 // Menu tab is itself a stack so it can push the Cart screen.
 function MenuStack() {
+  const { colors } = useTheme();
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Menu" component={MenuScreen} />
@@ -62,6 +64,7 @@ function MenuStack() {
 
 function MainTabs() {
   const { count } = useCart();
+  const { colors } = useTheme();
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <AppHeader />
@@ -101,6 +104,7 @@ function MainTabs() {
 
 // Root stack lets any tab open the full-screen EditOrder screen.
 function RootNavigator() {
+  const { colors } = useTheme();
   return (
     <Stack.Navigator>
       <Stack.Screen name="Tabs" component={MainTabs} options={{ headerShown: false }} />
@@ -120,10 +124,11 @@ function RootNavigator() {
 
 function Gate() {
   const { user, booting } = useAuth();
+  const { colors } = useTheme();
 
   if (booting) {
     return (
-      <View style={styles.center}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -136,10 +141,11 @@ function Gate() {
   );
 }
 
-export default function App() {
+function AppShell() {
+  const { colors } = useTheme();
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
+    <>
+      <StatusBar style={colors.statusBar} />
       <AuthProvider>
         <RestaurantProvider>
           <CartProvider>
@@ -147,10 +153,16 @@ export default function App() {
           </CartProvider>
         </RestaurantProvider>
       </AuthProvider>
-    </SafeAreaProvider>
+    </>
   );
 }
 
-const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-});
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AppShell />
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
+}

@@ -1,15 +1,18 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchTodaySummary, deleteOrder } from '../services/orderService';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { EmptyState } from '../components/ui';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
-import { colors, spacing, radius, font, shadow, CURRENCY } from '../theme/theme';
+import { spacing, radius, font, CURRENCY } from '../theme/theme';
 
 export default function TodayScreen({ navigation }) {
   const { user } = useAuth();
+  const { colors, shadow } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { columns, maxWidth } = useResponsive();
   const [people, setPeople] = useState([]);
   const [grandTotal, setGrandTotal] = useState(0);
@@ -157,7 +160,7 @@ export default function TodayScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   grid: {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Text,
   View,
@@ -6,7 +6,8 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { colors, spacing, radius, font, shadow } from '../theme/theme';
+import { useTheme } from '../context/ThemeContext';
+import { spacing, radius, font } from '../theme/theme';
 
 export function Button({
   title,
@@ -17,6 +18,8 @@ export function Button({
   style,
   small,
 }) {
+  const { colors, shadow } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const isPrimary = variant === 'primary';
   const isGhost = variant === 'ghost';
   const isDanger = variant === 'danger';
@@ -67,10 +70,14 @@ export function Button({
 }
 
 export function Card({ children, style }) {
+  const { colors, shadow } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return <View style={[styles.card, shadow.card, style]}>{children}</View>;
 }
 
 export function SectionHeader({ children, right }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{children}</Text>
@@ -80,6 +87,8 @@ export function SectionHeader({ children, right }) {
 }
 
 export function Badge({ label, tone = 'neutral' }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const map = {
     neutral: { bg: colors.surfaceAlt, fg: colors.textMuted },
     primary: { bg: colors.primaryLight, fg: colors.primaryDark },
@@ -95,6 +104,8 @@ export function Badge({ label, tone = 'neutral' }) {
 
 // Star rating — interactive when onRate is provided, otherwise display-only.
 export function StarRating({ value = 0, onRate, size = 22, showValue }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const rounded = Math.round(value);
   return (
     <View style={styles.stars}>
@@ -126,6 +137,8 @@ export function StarRating({ value = 0, onRate, size = 22, showValue }) {
 }
 
 export function EmptyState({ emoji = '🍽️', title, subtitle }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.empty}>
       <Text style={styles.emptyEmoji}>{emoji}</Text>
@@ -135,7 +148,7 @@ export function EmptyState({ emoji = '🍽️', title, subtitle }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   btn: {
     borderRadius: radius.md,
     paddingVertical: 15,

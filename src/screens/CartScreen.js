@@ -1,18 +1,21 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useRestaurant } from '../context/RestaurantContext';
+import { useTheme } from '../context/ThemeContext';
 import { placeOrder } from '../services/orderService';
 import { Button, EmptyState } from '../components/ui';
 import { alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
-import { colors, spacing, radius, font, shadow, CURRENCY } from '../theme/theme';
+import { spacing, radius, font, CURRENCY } from '../theme/theme';
 
 export default function CartScreen({ navigation }) {
   const { list, total, add, decrement, remove, clear, count } = useCart();
   const { user } = useAuth();
   const { selected } = useRestaurant();
+  const { colors, shadow } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { readWidth } = useResponsive();
   const [placing, setPlacing] = useState(false);
 
@@ -102,7 +105,7 @@ export default function CartScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   list: { padding: spacing.lg, paddingBottom: spacing.xl },
   restBanner: {
