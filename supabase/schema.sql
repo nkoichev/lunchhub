@@ -3,6 +3,12 @@
 --  Run this once in the Supabase SQL Editor.
 -- ============================================================
 
+-- The team orders lunch from Bulgaria, but Postgres defaults to UTC.
+-- Without this, current_date/now() roll over to the next day 2-3 hours
+-- late (Bulgaria is UTC+2/+3), so an order placed just after local
+-- midnight is still dated "yesterday" and lands in the wrong day's list.
+alter database postgres set timezone to 'Europe/Sofia';
+
 -- ---------- USERS ----------
 -- "Login with name": no passwords, just a unique display name.
 create table if not exists public.users (
