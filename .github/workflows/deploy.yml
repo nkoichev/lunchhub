@@ -1,0 +1,41 @@
+# Automatically publishes on every push to main:
+#   1. A mobile OTA update (installed apps update themselves on next open)
+#   2. The web version (redeployed to EAS Hosting)
+# Requires a repository secret EXPO_TOKEN.
+
+name: Deploy (mobile OTA + web)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish mobile OTA update
+        run: eas update --branch production --message "${{ github.event.head_commit.message }}" --non-interactive
+
+      - name: Build web
+        run: npx expo export --platform web
+
+      - name: Deploy web to EAS Hosting
+        run: eas deploy --prod --non-interactive

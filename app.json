@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#E85D2F"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "android": {
       "package": "com.lunchhub.app",
       "versionCode": 1,
@@ -34,8 +36,14 @@
       "supabaseUrl": "https://pdywobzszjcqfwkxzjsg.supabase.co",
       "supabaseAnonKey": "sb_publishable_dJb5DRn519ESscuDOzY5_Q_740EF435",
       "eas": {
-        "projectId": ""
+        "projectId": "8354ac26-5629-490e-bbdd-c87a9e163b31"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8354ac26-5629-490e-bbdd-c87a9e163b31"
     }
   }
 }
