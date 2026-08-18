@@ -42,3 +42,21 @@ export async function fetchTopRated(limit = 20) {
   if (error) throw new Error(error.message);
   return data || [];
 }
+
+// Everyone who rated a dish, with their name and when they rated it.
+export async function fetchRatersForDish(itemName) {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from('ratings')
+    .select('user_id, stars, comment, created_at, users(name)')
+    .eq('item_name', itemName)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data || []).map((r) => ({
+    userId: r.user_id,
+    name: r.users?.name ?? '—',
+    stars: r.stars,
+    comment: r.comment,
+    createdAt: r.created_at,
+  }));
+}

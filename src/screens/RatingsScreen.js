@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchHistory } from '../services/orderService';
 import { fetchMyRatings, rateDish, fetchTopRated } from '../services/ratingService';
 import { useAuth } from '../context/AuthContext';
 import { StarRating, EmptyState, Badge } from '../components/ui';
+import RatingDetailsModal from '../components/RatingDetailsModal';
 import { useResponsive } from '../hooks/useResponsive';
 import { colors, spacing, radius, font, shadow } from '../theme/theme';
 
@@ -16,6 +17,7 @@ export default function RatingsScreen() {
   const [topRated, setTopRated] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [detailsDish, setDetailsDish] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -73,6 +75,7 @@ export default function RatingsScreen() {
   }
 
   return (
+    <>
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
@@ -84,12 +87,17 @@ export default function RatingsScreen() {
         <>
           <Text style={styles.sectionTitle}>🏆 Топ ястия на екипа</Text>
           {topRated.map((t, i) => (
-            <View key={t.item_name} style={[styles.topRow, shadow.card]}>
+            <TouchableOpacity
+              key={t.item_name}
+              style={[styles.topRow, shadow.card]}
+              activeOpacity={0.7}
+              onPress={() => setDetailsDish(t.item_name)}
+            >
               <Text style={styles.rank}>{i + 1}</Text>
               <Text style={styles.topName}>{t.item_name}</Text>
               <StarRating value={t.avg_stars} size={14} showValue />
               <Text style={styles.topVotes}>{t.votes} гл.</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </>
       )}
@@ -124,6 +132,14 @@ export default function RatingsScreen() {
       )}
       </View>
     </ScrollView>
+    <RatingDetailsModal
+      visible={!!detailsDish}
+      itemName={detailsDish}
+      user={user}
+      onClose={() => setDetailsDish(null)}
+      onChanged={load}
+    />
+    </>
   );
 }
 
