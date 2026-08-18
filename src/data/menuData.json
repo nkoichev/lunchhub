@@ -1,0 +1,716 @@
+{
+  "id": "malkata-vereya",
+  "name": "Малката Вереа",
+  "days": {
+    "1": [
+      {
+        "name": "Пилешка супа",
+        "price": 2.1,
+        "category": "soup"
+      },
+      {
+        "name": "Топчета",
+        "price": 2.1,
+        "category": "main"
+      },
+      {
+        "name": "Шкембе чорба",
+        "price": 2.6,
+        "category": "soup"
+      },
+      {
+        "name": "Боб чорба",
+        "price": 2.0,
+        "category": "soup"
+      },
+      {
+        "name": "Таратор",
+        "price": 1.6,
+        "category": "soup"
+      },
+      {
+        "name": "Свинско винен кебап",
+        "price": 3.3,
+        "category": "main"
+      },
+      {
+        "name": "Свинско по ловджийски",
+        "price": 3.3,
+        "category": "main"
+      },
+      {
+        "name": "Пиле с ориз",
+        "price": 3.0,
+        "category": "main"
+      },
+      {
+        "name": "Пиле прясно зеле",
+        "price": 3.0,
+        "category": "main"
+      },
+      {
+        "name": "Кюфтета с доматен сос",
+        "price": 3.1,
+        "category": "main"
+      },
+      {
+        "name": "Чушка бюрек",
+        "price": 3.0,
+        "category": "main"
+      },
+      {
+        "name": "Мусака от тиквички",
+        "price": 2.9,
+        "category": "main"
+      },
+      {
+        "name": "Мусака",
+        "price": 3.1,
+        "category": "main"
+      },
+      {
+        "name": "Кюфте - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Кебапче - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Свинско шишче - 100 гр.",
+        "price": 1.4,
+        "category": "main"
+      },
+      {
+        "name": "Пилешка пържола с гарн.",
+        "price": 4.0,
+        "category": "main"
+      },
+      {
+        "name": "Свински бекон с гарн.",
+        "price": 4.2,
+        "category": "main"
+      },
+      {
+        "name": "Кашкавал пане с гарн.",
+        "price": 3.5,
+        "category": "main"
+      },
+      {
+        "name": "Шницел пане с гарн.",
+        "price": 3.4,
+        "category": "main"
+      },
+      {
+        "name": "Пържено кюфте - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Омлет с гарнитура",
+        "price": 2.9,
+        "category": "main"
+      },
+      {
+        "name": "Пържени картофи - 200 гр.",
+        "price": 1.7,
+        "category": "main"
+      },
+      {
+        "name": "Пърж. картофи с сирене",
+        "price": 1.9,
+        "category": "main"
+      },
+      {
+        "name": "Крем карамел",
+        "price": 1.5,
+        "category": "dessert"
+      },
+      {
+        "name": "Мляко с ориз",
+        "price": 1.5,
+        "category": "dessert"
+      },
+      {
+        "name": "Кадаиф",
+        "price": 1.5,
+        "category": "main"
+      },
+      {
+        "name": "Крем Сердика",
+        "price": 1.5,
+        "category": "dessert"
+      }
+    ],
+    "2": [
+      {
+        "name": "Агнешка супа",
+        "price": 2.6,
+        "category": "soup"
+      },
+      {
+        "name": "Пилешка супа",
+        "price": 2.1,
+        "category": "soup"
+      },
+      {
+        "name": "Топчета",
+        "price": 2.1,
+        "category": "main"
+      },
+      {
+        "name": "Градинска/спанак",
+        "price": 1.7,
+        "category": "main"
+      },
+      {
+        "name": "Таратор",
+        "price": 1.6,
+        "category": "soup"
+      },
+      {
+        "name": "Шкембе",
+        "price": 2.6,
+        "category": "main"
+      },
+      {
+        "name": "Пача",
+        "price": 2.4,
+        "category": "main"
+      },
+      {
+        "name": "Свинско с грах",
+        "price": 3.3,
+        "category": "main"
+      },
+      {
+        "name": "Печено пил. бутче с гарн.",
+        "price": 3.2,
+        "category": "main"
+      },
+      {
+        "name": "Агнешка дроб сарма",
+        "price": 3.5,
+        "category": "main"
+      },
+      {
+        "name": "Пълн. чушки с кайма",
+        "price": 3.1,
+        "category": "main"
+      },
+      {
+        "name": "Кюфтета с бял сос",
+        "price": 3.0,
+        "category": "main"
+      },
+      {
+        "name": "Картофени кюфтета",
+        "price": 3.0,
+        "category": "main"
+      },
+      {
+        "name": "Гъби с ориз",
+        "price": 2.9,
+        "category": "main"
+      },
+      {
+        "name": "Пил. дроб с лук",
+        "price": 3.0,
+        "category": "main"
+      },
+      {
+        "name": "Кюфте - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Кебапче - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Свинско шишче - 100 гр.",
+        "price": 1.4,
+        "category": "main"
+      },
+      {
+        "name": "Свински бекон с гарн.",
+        "price": 4.2,
+        "category": "main"
+      },
+      {
+        "name": "Кашкавал пане с гарн.",
+        "price": 3.5,
+        "category": "main"
+      },
+      {
+        "name": "Шницел пане с гарн.",
+        "price": 3.4,
+        "category": "main"
+      },
+      {
+        "name": "Пържено кюфте - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Пържени картофи - 200 гр.",
+        "price": 1.7,
+        "category": "main"
+      },
+      {
+        "name": "Пърж. картофи с сирене",
+        "price": 1.9,
+        "category": "main"
+      },
+      {
+        "name": "Крем карамел",
+        "price": 1.5,
+        "category": "dessert"
+      },
+      {
+        "name": "Мляко с ориз",
+        "price": 1.5,
+        "category": "dessert"
+      },
+      {
+        "name": "Макарони на фурна",
+        "price": 1.5,
+        "category": "main"
+      },
+      {
+        "name": "Крем Брюле",
+        "price": 1.5,
+        "category": "dessert"
+      }
+    ],
+    "3": [
+      {
+        "name": "Пилешка супа",
+        "price": 2.1,
+        "category": "soup"
+      },
+      {
+        "name": "Топчета",
+        "price": 2.1,
+        "category": "main"
+      },
+      {
+        "name": "Шкембе чорба",
+        "price": 2.6,
+        "category": "soup"
+      },
+      {
+        "name": "Гъбена",
+        "price": 2.0,
+        "category": "main"
+      },
+      {
+        "name": "Таратор",
+        "price": 1.6,
+        "category": "soup"
+      },
+      {
+        "name": "Свинско с ориз",
+        "price": 3.3,
+        "category": "main"
+      },
+      {
+        "name": "Пил. дроб сърма",
+        "price": 3.2,
+        "category": "main"
+      },
+      {
+        "name": "Имам баялдъ",
+        "price": 2.9,
+        "category": "main"
+      },
+      {
+        "name": "Скумрия в фолио с гарн.",
+        "price": 4.3,
+        "category": "main"
+      },
+      {
+        "name": "Гнездо с дом. сос",
+        "price": 3.1,
+        "category": "main"
+      },
+      {
+        "name": "Пържен хек с гарнитура",
+        "price": 3.9,
+        "category": "main"
+      },
+      {
+        "name": "Джолан с картофи",
+        "price": 3.9,
+        "category": "main"
+      },
+      {
+        "name": "Селски пай",
+        "price": 3.1,
+        "category": "main"
+      },
+      {
+        "name": "Кюфте - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Кебапче - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Свинско шишче - 100 гр.",
+        "price": 1.4,
+        "category": "main"
+      },
+      {
+        "name": "Пилешка пържола с гарн.",
+        "price": 4.0,
+        "category": "main"
+      },
+      {
+        "name": "Свински бекон с гарн.",
+        "price": 4.2,
+        "category": "main"
+      },
+      {
+        "name": "Кашкавал пане с гарн.",
+        "price": 3.5,
+        "category": "main"
+      },
+      {
+        "name": "Шницел пане с гарн.",
+        "price": 3.4,
+        "category": "main"
+      },
+      {
+        "name": "Пържено кюфте - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Омлет с гарнитура",
+        "price": 2.9,
+        "category": "main"
+      },
+      {
+        "name": "Пържени картофи - 200 гр.",
+        "price": 1.7,
+        "category": "main"
+      },
+      {
+        "name": "Пърж. картофи с сирене",
+        "price": 1.9,
+        "category": "main"
+      },
+      {
+        "name": "Крем карамел",
+        "price": 1.5,
+        "category": "dessert"
+      },
+      {
+        "name": "Мляко с ориз",
+        "price": 1.5,
+        "category": "dessert"
+      },
+      {
+        "name": "Ашуре",
+        "price": 1.5,
+        "category": "main"
+      },
+      {
+        "name": "Крем Сердика",
+        "price": 1.5,
+        "category": "dessert"
+      }
+    ],
+    "4": [
+      {
+        "name": "Пилешка супа",
+        "price": 2.1,
+        "category": "soup"
+      },
+      {
+        "name": "Топчета",
+        "price": 2.1,
+        "category": "main"
+      },
+      {
+        "name": "Леща",
+        "price": 2.0,
+        "category": "main"
+      },
+      {
+        "name": "Пача",
+        "price": 2.4,
+        "category": "main"
+      },
+      {
+        "name": "Джолан",
+        "price": 2.4,
+        "category": "main"
+      },
+      {
+        "name": "Таратор",
+        "price": 1.6,
+        "category": "soup"
+      },
+      {
+        "name": "Пил. бутче със зеленчуци",
+        "price": 3.2,
+        "category": "main"
+      },
+      {
+        "name": "Свинско с фасул",
+        "price": 3.3,
+        "category": "main"
+      },
+      {
+        "name": "Боб с кренвирши",
+        "price": 3.2,
+        "category": "main"
+      },
+      {
+        "name": "Руло Стефани",
+        "price": 3.1,
+        "category": "main"
+      },
+      {
+        "name": "Пълнен патладжан с кайма",
+        "price": 3.1,
+        "category": "main"
+      },
+      {
+        "name": "Зеленчукова мусака",
+        "price": 2.9,
+        "category": "main"
+      },
+      {
+        "name": "Пан. патладжан с гарн.",
+        "price": 3.0,
+        "category": "main"
+      },
+      {
+        "name": "Свински дроб с гарн.",
+        "price": 3.2,
+        "category": "main"
+      },
+      {
+        "name": "Пил. крилца с гарнитура",
+        "price": 3.2,
+        "category": "main"
+      },
+      {
+        "name": "Кюфте - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Кебапче - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Свинско шишче",
+        "price": 1.4,
+        "category": "main"
+      },
+      {
+        "name": "Пилешка пържола с гарн.",
+        "price": 4.0,
+        "category": "main"
+      },
+      {
+        "name": "Свински бекон с гарн.",
+        "price": 4.2,
+        "category": "main"
+      },
+      {
+        "name": "Кашкавал пане с гарн.",
+        "price": 3.5,
+        "category": "main"
+      },
+      {
+        "name": "Шницел пане с гарн.",
+        "price": 3.4,
+        "category": "main"
+      },
+      {
+        "name": "Пържено кюфте - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Омлет с гарнитура",
+        "price": 2.9,
+        "category": "main"
+      },
+      {
+        "name": "Пържени картофи - 200 гр.",
+        "price": 1.7,
+        "category": "main"
+      },
+      {
+        "name": "Пърж. картофи с сирене",
+        "price": 1.9,
+        "category": "main"
+      },
+      {
+        "name": "Яйца по панагюрски",
+        "price": 2.8,
+        "category": "main"
+      },
+      {
+        "name": "Крем карамел",
+        "price": 1.5,
+        "category": "dessert"
+      },
+      {
+        "name": "Мляко с ориз",
+        "price": 1.5,
+        "category": "dessert"
+      },
+      {
+        "name": "Бисквитена торта",
+        "price": 1.5,
+        "category": "main"
+      },
+      {
+        "name": "Крем Брюле",
+        "price": 1.5,
+        "category": "dessert"
+      }
+    ],
+    "5": [
+      {
+        "name": "Пилешка супа",
+        "price": 2.1,
+        "category": "soup"
+      },
+      {
+        "name": "Топчета",
+        "price": 2.1,
+        "category": "main"
+      },
+      {
+        "name": "Шкембе чорба",
+        "price": 2.6,
+        "category": "soup"
+      },
+      {
+        "name": "Боб чорба",
+        "price": 2.0,
+        "category": "soup"
+      },
+      {
+        "name": "Таратор",
+        "price": 1.6,
+        "category": "soup"
+      },
+      {
+        "name": "Свинско печено с гарн.",
+        "price": 3.9,
+        "category": "main"
+      },
+      {
+        "name": "Свинска кавърма",
+        "price": 3.8,
+        "category": "main"
+      },
+      {
+        "name": "Печ. бутче с картофи",
+        "price": 3.2,
+        "category": "main"
+      },
+      {
+        "name": "Гръцка мусака",
+        "price": 3.4,
+        "category": "main"
+      },
+      {
+        "name": "Пълнени тиквички",
+        "price": 3.0,
+        "category": "main"
+      },
+      {
+        "name": "Миш-маш",
+        "price": 2.9,
+        "category": "main"
+      },
+      {
+        "name": "Кюфте от тиквички - 100 гр.",
+        "price": 1.0,
+        "category": "main"
+      },
+      {
+        "name": "Кюфте - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Кебапче - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Свинско шишче - 100 гр.",
+        "price": 1.4,
+        "category": "main"
+      },
+      {
+        "name": "Свински бекон с гарн.",
+        "price": 4.2,
+        "category": "main"
+      },
+      {
+        "name": "Кашкавал пане с гарн.",
+        "price": 3.5,
+        "category": "main"
+      },
+      {
+        "name": "Шницел пане с гарн.",
+        "price": 3.4,
+        "category": "main"
+      },
+      {
+        "name": "Пържено кюфте - 100 гр.",
+        "price": 1.2,
+        "category": "main"
+      },
+      {
+        "name": "Омлет с гарнитура",
+        "price": 2.9,
+        "category": "main"
+      },
+      {
+        "name": "Пържени картофи - 200 гр.",
+        "price": 1.7,
+        "category": "main"
+      },
+      {
+        "name": "Пърж. картофи с сирене",
+        "price": 1.9,
+        "category": "main"
+      },
+      {
+        "name": "Крем карамел",
+        "price": 1.5,
+        "category": "dessert"
+      },
+      {
+        "name": "Мляко с ориз",
+        "price": 1.5,
+        "category": "dessert"
+      },
+      {
+        "name": "Крем Сердика",
+        "price": 1.5,
+        "category": "dessert"
+      }
+    ]
+  }
+}
