@@ -56,9 +56,30 @@ export async function fetchDishes(restaurantId) {
   return data || [];
 }
 
+// Menu items with the same (trimmed, case-insensitive) name that would end
+// up shown on the same day — either the exact weekday, or via the
+// "Всеки ден" (day_index 0) catch-all, which overlaps every specific day.
+async function findConflictingDish({ restaurantId, name, dayIndex, excludeId }) {
+  const { data, error } = await supabase
+    .from('menu_items')
+    .select('id, day_index')
+    .eq('restaurant_id', restaurantId)
+    .ilike('name', name.trim());
+  if (error) throw new Error(error.message);
+  return (data || []).find(
+    (row) =>
+      row.id !== excludeId &&
+      (dayIndex === 0 || row.day_index === 0 || row.day_index === dayIndex)
+  );
+}
+
 export async function addDish({ restaurantId, name, price, dayIndex, category }) {
   if (!isSupabaseConfigured) throw new Error('Базата данни не е настроена.');
   if (!(name || '').trim()) throw new Error('Въведете име на ястие.');
+  const conflict = await findConflictingDish({ restaurantId, name, dayIndex });
+  if (conflict) {
+    throw new Error('Вече има ястие с това име за този ден. Редактирайте съществуващото вместо да добавяте ново.');
+  }
   const { data, error } = await supabase
     .from('menu_items')
     .insert({
@@ -74,9 +95,15 @@ export async function addDish({ restaurantId, name, price, dayIndex, category })
   return data;
 }
 
-export async function updateDish(id, { name, price, dayIndex, category }) {
+export async function updateDish(id, { restaurantId, name, price, dayIndex, category }) {
   if (!isSupabaseConfigured) throw new Error('Базата данни не е настроена.');
   if (!(name || '').trim()) throw new Error('Въведете име на ястие.');
+  if (restaurantId) {
+    const conflict = await findConflictingDish({ restaurantId, name, dayIndex, excludeId: id });
+    if (conflict) {
+      throw new Error('Вече има друго ястие с това име за този ден.');
+    }
+  }
   const { error } = await supabase
     .from('menu_items')
     .update({

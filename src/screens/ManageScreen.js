@@ -66,7 +66,7 @@ export default function ManageScreen() {
   const saveDish = async ({ name, price, dayIndex, category }) => {
     try {
       if (dishModal.dish) {
-        await updateDish(dishModal.dish.id, { name, price, dayIndex, category });
+        await updateDish(dishModal.dish.id, { restaurantId: selected.id, name, price, dayIndex, category });
       } else {
         await addDish({ restaurantId: selected.id, name, price, dayIndex, category });
       }
