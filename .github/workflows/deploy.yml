@@ -32,7 +32,9 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Publish mobile OTA update
-        run: eas update --branch production --message "${{ github.event.head_commit.message }}" --non-interactive
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: eas update --branch production --message "${COMMIT_MESSAGE%%$'\n'*}" --non-interactive
 
       - name: Build web
         run: npx expo export --platform web
