@@ -36,7 +36,7 @@ export async function placeOrder(user, cart, restaurant) {
   const { error: itemsErr } = await supabase.from('order_items').insert(rows);
   if (itemsErr) throw new Error(itemsErr.message);
 
-  notifyOrderPlaced(user, restaurant?.name);
+  notifyOrderPlaced(user, restaurant?.name, cart, total);
 
   return order;
 }

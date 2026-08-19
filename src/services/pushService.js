@@ -45,8 +45,18 @@ export async function registerForPushNotifications(user) {
   }
 }
 
+// "Кебапче x2, Шопска салата" — capped so it can't blow up into an essay
+// for a big order; the OS truncates the notification anyway.
+function summarizeCart(cart) {
+  const parts = (cart || []).map((i) => (i.quantity > 1 ? `${i.name} x${i.quantity}` : i.name));
+  if (parts.length > 4) {
+    return `${parts.slice(0, 4).join(', ')} и още ${parts.length - 4}`;
+  }
+  return parts.join(', ');
+}
+
 // Notify everyone else's devices that a new order was placed.
-export async function notifyOrderPlaced(orderingUser, restaurantName) {
+export async function notifyOrderPlaced(orderingUser, restaurantName, cart, total) {
   if (!isSupabaseConfigured) return;
   try {
     const { data: tokens } = await supabase
@@ -55,10 +65,14 @@ export async function notifyOrderPlaced(orderingUser, restaurantName) {
       .neq('user_id', orderingUser.id);
     if (!tokens?.length) return;
 
+    const items = summarizeCart(cart);
+    const totalText = typeof total === 'number' ? ` — ${total.toFixed(2)} €` : '';
+    const body = `${orderingUser.name} поръча от ${restaurantName || 'менюто'}: ${items}${totalText}`;
+
     const messages = tokens.map((t) => ({
       to: t.token,
       title: '🍽️ Нова поръчка',
-      body: `${orderingUser.name} поръча от ${restaurantName || 'менюто'}`,
+      body,
       sound: 'default',
     }));
 
