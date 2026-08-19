@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TextInput,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
@@ -34,9 +35,11 @@ export default function MenuScreen({ navigation }) {
     const t = todayIndex();
     return WEEKDAYS.includes(t) ? t : 1; // default to Monday on weekends
   });
-  const [sections, setSections] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [sortMode, setSortMode] = useState('alpha'); // 'alpha' | 'category'
+  const [search, setSearch] = useState('');
 
   // Switching restaurant with a non-empty cart would mix restaurants in one
   // order, so confirm and clear first.
@@ -60,15 +63,9 @@ export default function MenuScreen({ navigation }) {
 
   const load = useCallback(async () => {
     try {
-      const items = await fetchMenu(selected?.id, day);
-      const grouped = CATEGORY_ORDER.map((cat) => ({
-        title: CATEGORY_LABELS[cat],
-        category: cat,
-        data: items.filter((i) => (i.category ?? 'main') === cat),
-      })).filter((s) => s.data.length);
-      setSections(grouped);
+      setItems(await fetchMenu(selected?.id, day));
     } catch (e) {
-      setSections([]);
+      setItems([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -84,6 +81,25 @@ export default function MenuScreen({ navigation }) {
     setRefreshing(true);
     load();
   };
+
+  // Search matches from the start of the dish name (not anywhere inside it).
+  const filtered = useMemo(() => {
+    const q = search.trim().toLocaleLowerCase('bg');
+    if (!q) return items;
+    return items.filter((i) => i.name.toLocaleLowerCase('bg').startsWith(q));
+  }, [items, search]);
+
+  const sections = useMemo(() => {
+    if (sortMode === 'alpha') {
+      const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name, 'bg'));
+      return sorted.length ? [{ title: null, category: 'all', data: sorted }] : [];
+    }
+    return CATEGORY_ORDER.map((cat) => ({
+      title: CATEGORY_LABELS[cat],
+      category: cat,
+      data: filtered.filter((i) => (i.category ?? 'main') === cat),
+    })).filter((s) => s.data.length);
+  }, [filtered, sortMode]);
 
   const centered = { width: '100%', maxWidth, alignSelf: 'center' };
   const cardBasis = columns === 1 ? '100%' : columns === 2 ? '48%' : '31.5%';
@@ -177,6 +193,30 @@ export default function MenuScreen({ navigation }) {
         </View>
       </View>
 
+      {/* Search + sort toggle */}
+      <View style={styles.barWrap}>
+        <View style={[styles.toolsBar, centered]}>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Търси ястие…"
+            placeholderTextColor={colors.textFaint}
+            style={styles.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+          />
+          <TouchableOpacity
+            style={styles.sortBtn}
+            onPress={() => setSortMode((m) => (m === 'alpha' ? 'category' : 'alpha'))}
+          >
+            <Text style={styles.sortBtnText}>
+              {sortMode === 'alpha' ? '📂 По категория' : '🔤 Азбучен ред'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -192,13 +232,17 @@ export default function MenuScreen({ navigation }) {
             {sections.length === 0 ? (
               <EmptyState
                 emoji="📭"
-                title="Няма меню за този ден"
-                subtitle="Опитайте с друг ден или дръпнете надолу за обновяване."
+                title={search ? 'Няма съвпадения' : 'Няма меню за този ден'}
+                subtitle={
+                  search
+                    ? 'Опитайте с друго начало на името.'
+                    : 'Опитайте с друг ден или дръпнете надолу за обновяване.'
+                }
               />
             ) : (
               sections.map((section) => (
                 <View key={section.category}>
-                  <Text style={styles.sectionHeader}>{section.title}</Text>
+                  {section.title && <Text style={styles.sectionHeader}>{section.title}</Text>}
                   <View style={styles.grid}>{section.data.map(renderDish)}</View>
                 </View>
               ))
@@ -282,6 +326,33 @@ const makeStyles = (colors) => StyleSheet.create({
     backgroundColor: colors.primary,
     marginTop: 3,
   },
+  toolsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 9,
+    fontSize: font.base,
+    color: colors.text,
+    backgroundColor: colors.surfaceAlt,
+  },
+  sortBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 9,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    flexShrink: 0,
+  },
+  sortBtnText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.textMuted },
   scrollContent: { padding: spacing.lg, paddingBottom: 120 },
   grid: {
     flexDirection: 'row',
