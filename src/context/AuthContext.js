@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loginWithName } from '../services/authService';
+import { registerForPushNotifications } from '../services/pushService';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'lunchhub.user';
@@ -13,7 +14,11 @@ export function AuthProvider({ children }) {
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) setUser(JSON.parse(raw));
+        if (raw) {
+          const u = JSON.parse(raw);
+          setUser(u);
+          registerForPushNotifications(u);
+        }
       } catch (_) {}
       setBooting(false);
     })();
@@ -23,6 +28,7 @@ export function AuthProvider({ children }) {
     const u = await loginWithName(name);
     setUser(u);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+    registerForPushNotifications(u);
     return u;
   };
 

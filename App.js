@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { CartProvider, useCart } from './src/context/CartContext';
@@ -22,6 +23,19 @@ import EditOrderScreen from './src/screens/EditOrderScreen';
 import ManageScreen from './src/screens/ManageScreen';
 
 import { font } from './src/theme/theme';
+
+// Show a banner/alert even while the app is in the foreground — a "someone
+// ordered" notification is useless if it only appears when backgrounded.
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();

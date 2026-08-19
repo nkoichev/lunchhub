@@ -18,6 +18,8 @@
     "@supabase/supabase-js": "^2.45.4",
     "expo": "~54.0.0",
     "expo-constants": "~18.0.13",
+    "expo-device": "~8.0.10",
+    "expo-notifications": "~0.32.17",
     "expo-status-bar": "~3.0.9",
     "expo-updates": "~29.0.20",
     "react": "19.1.0",

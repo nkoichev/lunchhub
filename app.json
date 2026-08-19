@@ -15,6 +15,14 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#E85D2F"
+        }
+      ]
+    ],
     "android": {
       "package": "com.lunchhub.app",
       "versionCode": 1,

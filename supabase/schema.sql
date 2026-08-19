@@ -76,6 +76,17 @@ create table if not exists public.ratings (
 );
 create index if not exists ratings_restaurant_item_idx on public.ratings(restaurant_id, item_name);
 
+-- ---------- PUSH TOKENS ----------
+-- One row per device. A user can have the app on more than one phone;
+-- a device's token is re-associated with whoever is logged in on it.
+create table if not exists public.push_tokens (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references public.users(id) on delete cascade,
+  token      text not null unique,
+  created_at timestamptz not null default now()
+);
+create index if not exists push_tokens_user_idx on public.push_tokens(user_id);
+
 -- ---------- AGGREGATE VIEW: average rating per dish, per restaurant ----------
 -- security_invoker: the view runs with the QUERYING role's privileges (and
 -- RLS) instead of the view owner's — otherwise a view silently bypasses any
@@ -120,11 +131,12 @@ alter table public.menu_items  enable row level security;
 alter table public.orders      enable row level security;
 alter table public.order_items enable row level security;
 alter table public.ratings     enable row level security;
+alter table public.push_tokens enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['users','restaurants','menu_items','orders','order_items','ratings']
+  foreach t in array array['users','restaurants','menu_items','orders','order_items','ratings','push_tokens']
   loop
     execute format(
       'drop policy if exists "anon_all_%1$s" on public.%1$s;', t);

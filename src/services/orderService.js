@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../config/supabase';
+import { notifyOrderPlaced } from './pushService';
 
 // Place an order for the given user at the given restaurant.
 // cart: [{ name, price, quantity }]
@@ -34,6 +35,8 @@ export async function placeOrder(user, cart, restaurant) {
 
   const { error: itemsErr } = await supabase.from('order_items').insert(rows);
   if (itemsErr) throw new Error(itemsErr.message);
+
+  notifyOrderPlaced(user, restaurant?.name);
 
   return order;
 }

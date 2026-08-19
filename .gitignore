@@ -11,3 +11,4 @@ web-build/
 *.key
 *.mobileprovision
 *.orig.*
+supabase/.temp/
