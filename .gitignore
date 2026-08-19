@@ -12,3 +12,6 @@ web-build/
 *.mobileprovision
 *.orig.*
 supabase/.temp/
+
+# Firebase Admin SDK private key — a real secret, unlike google-services.json.
+*firebase-adminsdk*.json

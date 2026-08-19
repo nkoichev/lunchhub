@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "126339636957",
+    "project_id": "lunchhub-f5c35",
+    "storage_bucket": "lunchhub-f5c35.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:126339636957:android:09da7c686d3b06fd080534",
+        "android_client_info": {
+          "package_name": "com.lunchhub.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5uj76o96Y83jHLdnthUKp0emMii_hDf0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
