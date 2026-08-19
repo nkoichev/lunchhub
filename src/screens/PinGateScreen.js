@@ -11,7 +11,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/ui';
 import { spacing, radius, font } from '../theme/theme';
-import { ACCESS_PIN } from '../config/supabase';
+import { ACCESS_PINS } from '../config/supabase';
 
 // One-time gate before the app is usable at all — a shared code so the
 // install link alone isn't enough for a stranger to get in. Verified once
@@ -30,7 +30,7 @@ export default function PinGateScreen({ onVerified }) {
     // No server round-trip needed — this is a soft "don't let strangers who
     // stumble on the install link in" gate, not a real auth boundary,
     // matching the rest of the app (open anon-key access to Supabase).
-    if (pin === ACCESS_PIN) {
+    if (ACCESS_PINS.includes(pin)) {
       await onVerified();
     } else {
       setError(true);

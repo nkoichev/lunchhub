@@ -17,11 +17,13 @@ export const isSupabaseConfigured =
 export const SUPABASE_URL = rawUrl;
 export const SUPABASE_ANON_KEY = rawKey;
 
-// Shared team access code (see app.json -> expo.extra.accessPin). Gates the
-// app before login — a soft deterrent against a stranger who stumbles on
-// the install link, not a real security boundary (the anon key above is
+// Shared team access codes (see app.json -> expo.extra.accessPins). Gates
+// the app before login — a soft deterrent against a stranger who stumbles
+// on the install link, not a real security boundary (the anon key above is
 // already open to anyone who has it, same as it is without this gate).
-export const ACCESS_PIN = extra.accessPin ?? '';
+// Any code in the list works, so an old one can keep working alongside a
+// newer one instead of invalidating it.
+export const ACCESS_PINS = extra.accessPins ?? [];
 
 // IMPORTANT: never pass an invalid URL to createClient — it throws at import
 // time and crashes the whole app ("runtime not ready"). When not configured,
