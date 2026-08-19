@@ -44,6 +44,7 @@
     "extra": {
       "supabaseUrl": "https://pdywobzszjcqfwkxzjsg.supabase.co",
       "supabaseAnonKey": "sb_publishable_dJb5DRn519ESscuDOzY5_Q_740EF435",
+      "accessPin": "A7#k2!",
       "eas": {
         "projectId": "8354ac26-5629-490e-bbdd-c87a9e163b31"
       }

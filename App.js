@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -13,6 +14,7 @@ import { RestaurantProvider } from './src/context/RestaurantContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import AppHeader from './src/components/AppHeader';
 
+import PinGateScreen from './src/screens/PinGateScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import MenuScreen from './src/screens/MenuScreen';
 import CartScreen from './src/screens/CartScreen';
@@ -36,6 +38,8 @@ if (Platform.OS !== 'web') {
     }),
   });
 }
+
+const PIN_STORAGE_KEY = 'lunchhub.pinVerified';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -139,14 +143,35 @@ function RootNavigator() {
 function Gate() {
   const { user, booting } = useAuth();
   const { colors } = useTheme();
+  const [pinVerified, setPinVerified] = useState(null); // null = still checking
 
-  if (booting) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  useEffect(() => {
+    (async () => {
+      try {
+        const v = await AsyncStorage.getItem(PIN_STORAGE_KEY);
+        setPinVerified(v === 'true');
+      } catch (_) {
+        setPinVerified(false);
+      }
+    })();
+  }, []);
+
+  const onPinVerified = async () => {
+    try {
+      await AsyncStorage.setItem(PIN_STORAGE_KEY, 'true');
+    } catch (_) {}
+    setPinVerified(true);
+  };
+
+  const spinner = (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </View>
+  );
+
+  if (pinVerified === null) return spinner;
+  if (!pinVerified) return <PinGateScreen onVerified={onPinVerified} />;
+  if (booting) return spinner;
 
   return (
     <NavigationContainer>
