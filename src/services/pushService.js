@@ -2,9 +2,15 @@ import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { supabase, isSupabaseConfigured } from '../config/supabase';
+import { supabase, isSupabaseConfigured, SUPABASE_URL, SUPABASE_ANON_KEY } from '../config/supabase';
 
 const PROJECT_ID = Constants.expoConfig?.extra?.eas?.projectId;
+
+// Expo's push endpoint sends no CORS headers, so a browser blocks calling it
+// directly (native isn't affected — CORS is browser-only). This Edge
+// Function relays the request server-side instead. See
+// supabase/functions/send-push/index.ts.
+const SEND_PUSH_URL = `${SUPABASE_URL}/functions/v1/send-push`;
 
 // Ask for permission and store this device's push token against the
 // logged-in user. Silently gives up on simulators/web or if denied —
@@ -56,9 +62,14 @@ export async function notifyOrderPlaced(orderingUser, restaurantName) {
       sound: 'default',
     }));
 
-    await fetch('https://exp.host/--/api/v2/push/send', {
+    await fetch(SEND_PUSH_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
       body: JSON.stringify(messages),
     });
   } catch (_) {
