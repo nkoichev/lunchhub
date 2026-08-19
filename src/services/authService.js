@@ -20,7 +20,20 @@ export async function loginWithName(rawName) {
     .maybeSingle();
 
   if (findErr) throw new Error(findErr.message);
-  if (existing) return existing;
+  if (existing) {
+    // Same person, different capitalization — adopt whatever they just
+    // typed instead of being stuck with how the name was first entered.
+    if (existing.name !== name) {
+      const { data: renamed, error: renameErr } = await supabase
+        .from('users')
+        .update({ name })
+        .eq('id', existing.id)
+        .select('id, name')
+        .single();
+      if (!renameErr && renamed) return renamed;
+    }
+    return existing;
+  }
 
   // Create a new user.
   const { data: created, error: insErr } = await supabase
