@@ -11,10 +11,14 @@ alter database postgres set timezone to 'Europe/Sofia';
 
 -- ---------- USERS ----------
 -- "Login with name": no passwords, just a unique display name.
+-- revolut_tag: optional payout detail a user sets for themselves, used
+-- when they're picked as the day's payer so others know where to send
+-- their share.
 create table if not exists public.users (
   id          uuid primary key default gen_random_uuid(),
   name        text not null unique,
-  created_at  timestamptz not null default now()
+  created_at  timestamptz not null default now(),
+  revolut_tag text
 );
 
 -- ---------- RESTAURANTS ----------
@@ -37,6 +41,9 @@ create index if not exists menu_items_day_idx on public.menu_items(day_index);
 create index if not exists menu_items_name_idx on public.menu_items(name);
 
 -- ---------- ORDERS ----------
+-- is_paid / payer_user_id: split-bill tracking — payer_user_id is stamped
+-- with that day's picked payer (see day_payers below), is_paid is toggled
+-- once the order's owner has settled up with them.
 create table if not exists public.orders (
   id              uuid primary key default gen_random_uuid(),
   user_id         uuid not null references public.users(id) on delete cascade,
@@ -44,10 +51,21 @@ create table if not exists public.orders (
   total           numeric(8,2) not null default 0,
   restaurant_id   text references public.restaurants(id),
   restaurant_name text,
-  created_at      timestamptz not null default now()
+  created_at      timestamptz not null default now(),
+  is_paid         boolean not null default false,
+  payer_user_id   uuid references public.users(id) on delete set null
 );
 create index if not exists orders_user_idx on public.orders(user_id);
 create index if not exists orders_date_idx on public.orders(order_date);
+
+-- ---------- DAY PAYERS ----------
+-- One payer per calendar day — whoever fronts the restaurant bill and gets
+-- paid back by everyone else via Revolut.
+create table if not exists public.day_payers (
+  order_date     date primary key,
+  payer_user_id  uuid not null references public.users(id) on delete cascade,
+  updated_at     timestamptz not null default now()
+);
 
 -- ---------- ORDER ITEMS ----------
 create table if not exists public.order_items (
@@ -108,8 +126,10 @@ select
   o.id              as order_id,
   o.user_id         as user_id,
   u.name            as client,
+  u.revolut_tag,
   o.order_date,
   o.total,
+  o.is_paid,
   o.restaurant_id,
   o.restaurant_name,
   oi.item_name,
@@ -132,11 +152,12 @@ alter table public.orders      enable row level security;
 alter table public.order_items enable row level security;
 alter table public.ratings     enable row level security;
 alter table public.push_tokens enable row level security;
+alter table public.day_payers  enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['users','restaurants','menu_items','orders','order_items','ratings','push_tokens']
+  foreach t in array array['users','restaurants','menu_items','orders','order_items','ratings','push_tokens','day_payers']
   loop
     execute format(
       'drop policy if exists "anon_all_%1$s" on public.%1$s;', t);

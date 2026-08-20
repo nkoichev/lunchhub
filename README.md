@@ -45,6 +45,7 @@ The original app read from Google Sheets via an Apps Script — fragile, hard to
 6. **If you already ran an older `schema.sql`** (before the database was set to Bulgaria's timezone), also run [`supabase/migration_timezone.sql`](supabase/migration_timezone.sql) once.
 7. **If you already ran an older `schema.sql`** (before the views were set to `security_invoker`), also run [`supabase/migration_security_invoker_views.sql`](supabase/migration_security_invoker_views.sql) once.
 8. **If you already ran an older `schema.sql`** (before push notifications), also run [`supabase/migration_push_tokens.sql`](supabase/migration_push_tokens.sql) once.
+9. **If you already ran an older `schema.sql`** (before the stray `rls_auto_enable()` function was locked down), also run [`supabase/migration_revoke_rls_auto_enable.sql`](supabase/migration_revoke_rls_auto_enable.sql) once.
 
 **Adding more restaurants:** copy [`supabase/add_restaurant_template.sql`](supabase/add_restaurant_template.sql), fill in the restaurant name and its dishes, and run it. The new restaurant's button appears in the app automatically (pull to refresh). No rebuild needed.
 
