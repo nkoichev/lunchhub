@@ -97,7 +97,13 @@ export default function TodayScreen({ navigation }) {
       alertMessage('Няма Revolut таг', 'Платецът още не си е задал Revolut таг.');
       return;
     }
-    const url = `https://revolut.me/${payer.revolutTag}/eur${p.total.toFixed(2)}`;
+    // Revolut doesn't publicly document a URL format for pre-filling the
+    // amount on a personal revolut.me link (unlike e.g. paypal.me) — the
+    // amount+currency suffix we used to build here gets rejected by the
+    // Revolut app ("We couldn't open that link"). Link to the bare profile
+    // instead and let the person type the amount themselves; it's shown
+    // right on this button.
+    const url = `https://revolut.me/${payer.revolutTag}`;
     Linking.openURL(url).catch(() =>
       alertMessage('Грешка', 'Линкът не можа да се отвори.')
     );
