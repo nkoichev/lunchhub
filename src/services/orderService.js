@@ -1,7 +1,20 @@
 import { supabase, isSupabaseConfigured } from '../config/supabase';
 import { notifyOrderPlaced } from './pushService';
 
-// Place an order for the given user at the given restaurant.
+// Local calendar date as 'YYYY-MM-DD', matching the `date` column's format.
+// Trusts the device clock, same as the rest of the app (e.g. the menu's
+// default weekday) — fine for a single-city team.
+function todayDateString() {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+// Place an order for the given user at the given restaurant. If they
+// already have an order today at the same restaurant, the cart is merged
+// into it (quantities added, new dishes appended) instead of creating a
+// second, separate order for the same person/place/day.
 // cart: [{ name, price, quantity }]
 export async function placeOrder(user, cart, restaurant) {
   if (!cart.length) throw new Error('Кошницата е празна.');
@@ -11,32 +24,92 @@ export async function placeOrder(user, cart, restaurant) {
     );
   }
 
-  const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const addedTotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
-  const { data: order, error: orderErr } = await supabase
+  let existingQuery = supabase
     .from('orders')
-    .insert({
-      user_id: user.id,
-      total,
-      restaurant_id: restaurant?.id ?? null,
-      restaurant_name: restaurant?.name ?? null,
-    })
-    .select('id, order_date, total')
-    .single();
-  if (orderErr) throw new Error(orderErr.message);
+    .select('id, total')
+    .eq('user_id', user.id)
+    .eq('order_date', todayDateString());
+  existingQuery = restaurant?.id
+    ? existingQuery.eq('restaurant_id', restaurant.id)
+    : existingQuery.is('restaurant_id', null);
+  const { data: existingMatches } = await existingQuery
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const existing = existingMatches?.[0];
 
-  const rows = cart.map((i) => ({
-    order_id: order.id,
-    item_name: i.name,
-    price: i.price,
-    quantity: i.quantity,
-    line_total: i.price * i.quantity,
-  }));
+  let order;
+  if (existing) {
+    const { data: existingItems } = await supabase
+      .from('order_items')
+      .select('id, item_name, quantity')
+      .eq('order_id', existing.id);
+    const byName = {};
+    (existingItems || []).forEach((it) => {
+      byName[it.item_name] = it;
+    });
 
-  const { error: itemsErr } = await supabase.from('order_items').insert(rows);
-  if (itemsErr) throw new Error(itemsErr.message);
+    const toInsert = [];
+    for (const i of cart) {
+      const match = byName[i.name];
+      if (match) {
+        const quantity = match.quantity + i.quantity;
+        const { error } = await supabase
+          .from('order_items')
+          .update({ quantity, line_total: i.price * quantity })
+          .eq('id', match.id);
+        if (error) throw new Error(error.message);
+      } else {
+        toInsert.push({
+          order_id: existing.id,
+          item_name: i.name,
+          price: i.price,
+          quantity: i.quantity,
+          line_total: i.price * i.quantity,
+        });
+      }
+    }
+    if (toInsert.length) {
+      const { error } = await supabase.from('order_items').insert(toInsert);
+      if (error) throw new Error(error.message);
+    }
 
-  notifyOrderPlaced(user, restaurant?.name, cart, total);
+    const total = Number(existing.total) + addedTotal;
+    const { data: updated, error: updErr } = await supabase
+      .from('orders')
+      .update({ total })
+      .eq('id', existing.id)
+      .select('id, order_date, total')
+      .single();
+    if (updErr) throw new Error(updErr.message);
+    order = updated;
+  } else {
+    const { data: created, error: orderErr } = await supabase
+      .from('orders')
+      .insert({
+        user_id: user.id,
+        total: addedTotal,
+        restaurant_id: restaurant?.id ?? null,
+        restaurant_name: restaurant?.name ?? null,
+      })
+      .select('id, order_date, total')
+      .single();
+    if (orderErr) throw new Error(orderErr.message);
+
+    const rows = cart.map((i) => ({
+      order_id: created.id,
+      item_name: i.name,
+      price: i.price,
+      quantity: i.quantity,
+      line_total: i.price * i.quantity,
+    }));
+    const { error: itemsErr } = await supabase.from('order_items').insert(rows);
+    if (itemsErr) throw new Error(itemsErr.message);
+    order = created;
+  }
+
+  notifyOrderPlaced(user, restaurant?.name, cart, addedTotal);
 
   return order;
 }
