@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
-import { updateRevolutTag } from '../services/paymentService';
+import { updateRevolutTag, updateBlinkPhone } from '../services/paymentService';
 import { alertMessage } from '../utils/confirm';
 import { Button } from './ui';
 import { spacing, radius, font } from '../theme/theme';
@@ -11,6 +11,7 @@ export default function ProfileModal({ visible, user, onClose }) {
   const { colors, shadow } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [tag, setTag] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -19,18 +20,25 @@ export default function ProfileModal({ visible, user, onClose }) {
     setLoading(true);
     supabase
       .from('users')
-      .select('revolut_tag')
+      .select('revolut_tag, blink_phone')
       .eq('id', user.id)
       .single()
-      .then(({ data }) => setTag(data?.revolut_tag ?? ''))
+      .then(({ data }) => {
+        setTag(data?.revolut_tag ?? '');
+        setPhone(data?.blink_phone ?? '');
+      })
       .finally(() => setLoading(false));
   }, [visible, user]);
 
   const onSave = async () => {
     setSaving(true);
     try {
-      const clean = await updateRevolutTag(user.id, tag);
-      setTag(clean);
+      const [cleanTag, cleanPhone] = await Promise.all([
+        updateRevolutTag(user.id, tag),
+        updateBlinkPhone(user.id, phone),
+      ]);
+      setTag(cleanTag);
+      setPhone(cleanPhone);
       onClose();
     } catch (e) {
       alertMessage('Грешка', e.message);
@@ -44,14 +52,14 @@ export default function ProfileModal({ visible, user, onClose }) {
       <View style={styles.backdrop}>
         <View style={[styles.sheet, shadow.floating]}>
           <View style={styles.handle} />
-          <Text style={styles.title}>Вашият Revolut таг</Text>
+          <Text style={styles.title}>Данни за плащане</Text>
           <Text style={styles.subtitle}>
-            Използва се, за да могат колегите да ви плащат при разделяне на сметката.
+            Използват се, за да могат колегите да ви плащат при разделяне на сметката.
           </Text>
 
           <Text style={styles.label}>Revolut таг</Text>
           <View style={styles.inputRow}>
-            <Text style={styles.at}>@</Text>
+            <Text style={styles.prefix}>@</Text>
             <TextInput
               value={tag}
               onChangeText={setTag}
@@ -60,6 +68,20 @@ export default function ProfileModal({ visible, user, onClose }) {
               style={styles.input}
               autoCapitalize="none"
               autoCorrect={false}
+              editable={!loading}
+            />
+          </View>
+
+          <Text style={[styles.label, { marginTop: spacing.lg }]}>Телефон за Blink</Text>
+          <View style={styles.inputRow}>
+            <Text style={styles.prefix}>📱</Text>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="напр. 0888123456"
+              placeholderTextColor={colors.textFaint}
+              style={styles.input}
+              keyboardType="phone-pad"
               editable={!loading}
             />
           </View>
@@ -116,7 +138,7 @@ const makeStyles = (colors) =>
       backgroundColor: colors.surfaceAlt,
       paddingLeft: spacing.lg,
     },
-    at: { fontSize: font.md, color: colors.textFaint, marginRight: 2 },
+    prefix: { fontSize: font.md, color: colors.textFaint, marginRight: 2 },
     input: {
       flex: 1,
       paddingHorizontal: spacing.sm,
