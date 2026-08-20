@@ -24,6 +24,7 @@ import {
 } from '../services/menuAdminService';
 import { Button, Badge, EmptyState } from '../components/ui';
 import DishFormModal from '../components/DishFormModal';
+import { fetchSheetOrders, importSheetOrders } from '../services/sheetImportService';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { isSupabaseConfigured } from '../config/supabase';
@@ -42,6 +43,7 @@ export default function ManageScreen() {
   const [restModal, setRestModal] = useState(false);
   const [newRestName, setNewRestName] = useState('');
   const [addingRest, setAddingRest] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const load = useCallback(async () => {
     if (!selected) {
@@ -113,6 +115,42 @@ export default function ManageScreen() {
     }
   };
 
+  // ---- test-only Google Sheets import ----
+  const onImportFromSheet = async () => {
+    setImporting(true);
+    try {
+      const { rows, unmappedRestaurants } = await fetchSheetOrders();
+      if (!rows.length) {
+        alertMessage('Няма какво да се внесе', 'Google Sheet-ът не съдържа разчетими редове с поръчки.');
+        return;
+      }
+      const people = new Set(rows.map((r) => r.name)).size;
+      const warn = unmappedRestaurants.length
+        ? `\n\n⚠️ Непознат ресторант, ще се пропусне: ${unmappedRestaurants.join(', ')}`
+        : '';
+      confirmDialog({
+        title: 'Импорт от Google Sheets',
+        message: `Ще внеса ${rows.length} реда за ${people} души от таблицата.${warn}\n\nПродължавам ли?`,
+        confirmText: 'Импортирай',
+        onConfirm: async () => {
+          try {
+            const result = await importSheetOrders(rows);
+            alertMessage(
+              'Готово',
+              `Нови поръчки: ${result.createdOrders}\nОбновени поръчки: ${result.updatedOrders}\nХора: ${result.people.join(', ')}`
+            );
+          } catch (e) {
+            alertMessage('Грешка при импорт', e.message);
+          }
+        },
+      });
+    } catch (e) {
+      alertMessage('Грешка', e.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   if (!isSupabaseConfigured) {
     return (
       <View style={styles.container}>
@@ -158,6 +196,17 @@ export default function ManageScreen() {
           })}
           <TouchableOpacity style={styles.addRestChip} onPress={() => setRestModal(true)}>
             <Text style={styles.addRestChipText}>+ Ресторант</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.addRestChip, { borderColor: colors.primary }]}
+            onPress={onImportFromSheet}
+            disabled={importing}
+          >
+            {importing ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={[styles.addRestChipText, { color: colors.primary }]}>📥 Импорт от Sheets</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
