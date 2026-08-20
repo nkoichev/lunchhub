@@ -12,18 +12,6 @@ export async function updateRevolutTag(userId, tag) {
   return clean;
 }
 
-// Save this user's phone number for Blink P2P transfers (e.g. "0888123456").
-export async function updateBlinkPhone(userId, phone) {
-  if (!isSupabaseConfigured) throw new Error('Базата данни не е настроена.');
-  const clean = (phone || '').trim();
-  const { error } = await supabase
-    .from('users')
-    .update({ blink_phone: clean || null })
-    .eq('id', userId);
-  if (error) throw new Error(error.message);
-  return clean;
-}
-
 // Who is paying for everyone today (one payer per calendar day).
 export async function fetchDayPayer(dateString) {
   if (!isSupabaseConfigured) return null;

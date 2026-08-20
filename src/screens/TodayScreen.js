@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Alert, Linking } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchTodaySummary, deleteOrder, todayDateString } from '../services/orderService';
 import { fetchDayPayer, setDayPayer, markOrderPaid } from '../services/paymentService';
@@ -93,7 +92,7 @@ export default function TodayScreen({ navigation }) {
     }
   };
 
-  const onPayRevolut = (p) => {
+  const onPay = (p) => {
     if (!payer?.revolutTag) {
       alertMessage('Няма Revolut таг', 'Платецът още не си е задал Revolut таг.');
       return;
@@ -107,22 +106,6 @@ export default function TodayScreen({ navigation }) {
     const url = `https://revolut.me/${payer.revolutTag}`;
     Linking.openURL(url).catch(() =>
       alertMessage('Грешка', 'Линкът не можа да се отвори.')
-    );
-  };
-
-  // Blink is a bank-to-bank rail built into every Bulgarian bank's own app —
-  // there's no single "Blink app" or shared deep-link scheme to open, so the
-  // best we can do is hand over the phone number for the person to paste
-  // into their own banking app.
-  const onPayBlink = async (p) => {
-    if (!payer?.blinkPhone) {
-      alertMessage('Няма Blink номер', 'Платецът още не си е задал телефон за Blink.');
-      return;
-    }
-    await Clipboard.setStringAsync(payer.blinkPhone);
-    alertMessage(
-      'Номерът е копиран',
-      `${payer.blinkPhone} — отвори банковото си приложение и преведи ${p.total.toFixed(2)} ${CURRENCY} чрез Blink на ${payer.name}.`
     );
   };
 
@@ -241,35 +224,21 @@ export default function TodayScreen({ navigation }) {
                   </View>
                 )}
                 {payerUserId && p.userId !== payerUserId && (
-                  <>
-                    <View style={styles.payRow}>
-                      {payer?.revolutTag && (
-                        <TouchableOpacity style={styles.payBtn} onPress={() => onPayRevolut(p)}>
-                          <Text style={styles.payBtnText}>
-                            💳 Revolut {p.total.toFixed(2)} {CURRENCY}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                      {payer?.blinkPhone && (
-                        <TouchableOpacity style={[styles.payBtn, styles.payBtnBlink]} onPress={() => onPayBlink(p)}>
-                          <Text style={styles.payBtnText}>
-                            📱 Blink {p.total.toFixed(2)} {CURRENCY}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                      {!payer?.revolutTag && !payer?.blinkPhone && (
-                        <Text style={styles.noPayoutHint}>Платецът няма зададен Revolut или Blink.</Text>
-                      )}
-                    </View>
+                  <View style={styles.payRow}>
+                    <TouchableOpacity style={styles.payBtn} onPress={() => onPay(p)}>
+                      <Text style={styles.payBtnText}>
+                        💳 Плати {p.total.toFixed(2)} {CURRENCY}
+                      </Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.paidToggle, p.isPaid && styles.paidToggleActive, styles.paidToggleStandalone]}
+                      style={[styles.paidToggle, p.isPaid && styles.paidToggleActive]}
                       onPress={() => onTogglePaid(p)}
                     >
                       <Text style={[styles.paidToggleText, p.isPaid && styles.paidToggleTextActive]}>
                         {p.isPaid ? '✅ Платено' : 'Платено?'}
                       </Text>
                     </TouchableOpacity>
-                  </>
+                  </View>
                 )}
 
                 {isMe ? (
@@ -356,10 +325,7 @@ const makeStyles = (colors) => StyleSheet.create({
     borderRadius: radius.sm,
     backgroundColor: colors.primary,
   },
-  payBtnBlink: { backgroundColor: colors.accent },
   payBtnText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.onPrimary },
-  noPayoutHint: { fontSize: font.xs, color: colors.textFaint, flex: 1 },
-  paidToggleStandalone: { alignSelf: 'flex-start', marginTop: spacing.sm },
   paidToggle: {
     alignItems: 'center',
     justifyContent: 'center',

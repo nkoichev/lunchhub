@@ -194,7 +194,7 @@ export async function fetchTodaySummary() {
 
   const { data, error } = await supabase
     .from('today_orders')
-    .select('client, user_id, total, item_name, quantity, line_total, order_id, restaurant_name, revolut_tag, blink_phone, is_paid');
+    .select('client, user_id, total, item_name, quantity, line_total, order_id, restaurant_name, revolut_tag, is_paid');
   if (error) throw new Error(error.message);
 
   const map = {};
@@ -211,7 +211,6 @@ export async function fetchTodaySummary() {
         orderId: row.order_id,
         restaurantName: row.restaurant_name,
         revolutTag: row.revolut_tag,
-        blinkPhone: row.blink_phone,
         isPaid: row.is_paid,
       };
     }
