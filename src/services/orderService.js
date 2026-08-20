@@ -4,7 +4,7 @@ import { notifyOrderPlaced } from './pushService';
 // Local calendar date as 'YYYY-MM-DD', matching the `date` column's format.
 // Trusts the device clock, same as the rest of the app (e.g. the menu's
 // default weekday) — fine for a single-city team.
-function todayDateString() {
+export function todayDateString() {
   const d = new Date();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -85,6 +85,15 @@ export async function placeOrder(user, cart, restaurant) {
     if (updErr) throw new Error(updErr.message);
     order = updated;
   } else {
+    // If the team already picked today's payer, a brand-new order should
+    // carry that too (setDayPayer only stamps orders that exist *before*
+    // the pick — this covers ones placed after).
+    const { data: dayPayer } = await supabase
+      .from('day_payers')
+      .select('payer_user_id')
+      .eq('order_date', todayDateString())
+      .maybeSingle();
+
     const { data: created, error: orderErr } = await supabase
       .from('orders')
       .insert({
@@ -92,6 +101,7 @@ export async function placeOrder(user, cart, restaurant) {
         total: addedTotal,
         restaurant_id: restaurant?.id ?? null,
         restaurant_name: restaurant?.name ?? null,
+        payer_user_id: dayPayer?.payer_user_id ?? null,
       })
       .select('id, order_date, total')
       .single();
@@ -184,7 +194,7 @@ export async function fetchTodaySummary() {
 
   const { data, error } = await supabase
     .from('today_orders')
-    .select('client, user_id, total, item_name, quantity, line_total, order_id, restaurant_name');
+    .select('client, user_id, total, item_name, quantity, line_total, order_id, restaurant_name, revolut_tag, is_paid');
   if (error) throw new Error(error.message);
 
   const map = {};
@@ -200,6 +210,8 @@ export async function fetchTodaySummary() {
         total: 0,
         orderId: row.order_id,
         restaurantName: row.restaurant_name,
+        revolutTag: row.revolut_tag,
+        isPaid: row.is_paid,
       };
     }
     map[key].items.push({

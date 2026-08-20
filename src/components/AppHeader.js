@@ -7,6 +7,7 @@ import { RESTAURANT } from '../data/menu';
 import { confirmDialog } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import ThemeModal from './ThemeModal';
+import ProfileModal from './ProfileModal';
 import { spacing, font } from '../theme/theme';
 
 export default function AppHeader() {
@@ -15,6 +16,7 @@ export default function AppHeader() {
   const insets = useSafeAreaInsets();
   const { maxWidth } = useResponsive();
   const [themeModalOpen, setThemeModalOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const confirmLogout = () => {
@@ -34,6 +36,9 @@ export default function AppHeader() {
           <Text style={styles.greeting}>Здравей, {user?.name} 👋</Text>
           <Text style={styles.subtitle}>{RESTAURANT.name}</Text>
         </View>
+        <TouchableOpacity onPress={() => setProfileModalOpen(true)} style={styles.iconBtn} hitSlop={8}>
+          <Text style={styles.iconBtnText}>💳</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => setThemeModalOpen(true)} style={styles.iconBtn} hitSlop={8}>
           <Text style={styles.iconBtnText}>🎨</Text>
         </TouchableOpacity>
@@ -42,6 +47,7 @@ export default function AppHeader() {
         </TouchableOpacity>
       </View>
       <ThemeModal visible={themeModalOpen} onClose={() => setThemeModalOpen(false)} />
+      <ProfileModal visible={profileModalOpen} user={user} onClose={() => setProfileModalOpen(false)} />
     </View>
   );
 }

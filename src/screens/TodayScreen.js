@@ -1,10 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Alert, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { fetchTodaySummary, deleteOrder } from '../services/orderService';
+import { fetchTodaySummary, deleteOrder, todayDateString } from '../services/orderService';
+import { fetchDayPayer, setDayPayer, markOrderPaid } from '../services/paymentService';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { EmptyState } from '../components/ui';
+import { EmptyState, Badge } from '../components/ui';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
@@ -16,14 +17,20 @@ export default function TodayScreen({ navigation }) {
   const { columns, maxWidth } = useResponsive();
   const [people, setPeople] = useState([]);
   const [grandTotal, setGrandTotal] = useState(0);
+  const [payerUserId, setPayerUserId] = useState(null);
+  const [payerBusy, setPayerBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const { people, grandTotal } = await fetchTodaySummary();
+      const [{ people, grandTotal }, payer] = await Promise.all([
+        fetchTodaySummary(),
+        fetchDayPayer(todayDateString()),
+      ]);
       setPeople(people);
       setGrandTotal(grandTotal);
+      setPayerUserId(payer);
     } catch (_) {
       setPeople([]);
     } finally {
@@ -63,6 +70,49 @@ export default function TodayScreen({ navigation }) {
 
   // Distinct people (a person may have >1 order today).
   const peopleCount = new Set(people.map((p) => p.userId)).size;
+  const distinctPeople = Object.values(
+    people.reduce((acc, p) => {
+      if (!acc[p.userId]) acc[p.userId] = { userId: p.userId, name: p.name };
+      return acc;
+    }, {})
+  );
+  const payer = people.find((p) => p.userId === payerUserId);
+
+  const onPickPayer = async (userId) => {
+    const next = payerUserId === userId ? null : userId; // tap again to unset
+    setPayerBusy(true);
+    setPayerUserId(next);
+    try {
+      await setDayPayer(todayDateString(), next);
+      load();
+    } catch (e) {
+      alertMessage('Грешка', e.message);
+    } finally {
+      setPayerBusy(false);
+    }
+  };
+
+  const onPay = (p) => {
+    if (!payer?.revolutTag) {
+      alertMessage('Няма Revolut таг', 'Платецът още не си е задал Revolut таг.');
+      return;
+    }
+    const url = `https://revolut.me/${payer.revolutTag}/eur${p.total.toFixed(2)}`;
+    Linking.openURL(url).catch(() =>
+      alertMessage('Грешка', 'Линкът не можа да се отвори.')
+    );
+  };
+
+  const onTogglePaid = async (p) => {
+    try {
+      await markOrderPaid(p.orderId, !p.isPaid);
+      setPeople((prev) =>
+        prev.map((x) => (x.orderId === p.orderId ? { ...x, isPaid: !x.isPaid } : x))
+      );
+    } catch (e) {
+      alertMessage('Грешка', e.message);
+    }
+  };
 
   if (loading) {
     return (
@@ -98,6 +148,31 @@ export default function TodayScreen({ navigation }) {
             <Text style={styles.totalCardSub}>
               {peopleCount} {peopleCount === 1 ? 'човек' : 'души'} поръчаха
             </Text>
+          </View>
+
+          <View style={[styles.payerCard, shadow.card]}>
+            <Text style={styles.payerLabel}>Кой плаща днес?</Text>
+            <View style={styles.payerChips}>
+              {distinctPeople.map((dp) => {
+                const active = dp.userId === payerUserId;
+                return (
+                  <TouchableOpacity
+                    key={dp.userId}
+                    disabled={payerBusy}
+                    onPress={() => onPickPayer(dp.userId)}
+                    style={[styles.payerChip, active && styles.payerChipActive]}
+                  >
+                    <Text style={[styles.payerChipText, active && styles.payerChipTextActive]}>
+                      {active ? '💰 ' : ''}
+                      {dp.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {!payerUserId && (
+              <Text style={styles.payerHint}>Изберете кой плаща сметката днес, за да се появят бутоните за плащане.</Text>
+            )}
           </View>
 
           <View style={styles.grid}>
@@ -136,6 +211,30 @@ export default function TodayScreen({ navigation }) {
                     </Text>
                   </View>
                 ))}
+
+                {payerUserId && p.userId === payerUserId && (
+                  <View style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}>
+                    <Badge label="💰 Плаща днес" tone="primary" />
+                  </View>
+                )}
+                {payerUserId && p.userId !== payerUserId && (
+                  <View style={styles.payRow}>
+                    <TouchableOpacity style={styles.payBtn} onPress={() => onPay(p)}>
+                      <Text style={styles.payBtnText}>
+                        💳 Плати {p.total.toFixed(2)} {CURRENCY}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.paidToggle, p.isPaid && styles.paidToggleActive]}
+                      onPress={() => onTogglePaid(p)}
+                    >
+                      <Text style={[styles.paidToggleText, p.isPaid && styles.paidToggleTextActive]}>
+                        {p.isPaid ? '✅ Платено' : 'Платено?'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 {isMe ? (
                   <View style={styles.actions}>
                     <TouchableOpacity
@@ -179,6 +278,61 @@ const makeStyles = (colors) => StyleSheet.create({
   totalCardLabel: { color: '#ffffffcc', fontSize: font.sm, fontWeight: font.semibold, textTransform: 'uppercase', letterSpacing: 0.8 },
   totalCardValue: { color: colors.onPrimary, fontSize: font.xxl, fontWeight: font.bold, marginTop: 4 },
   totalCardSub: { color: '#ffffffcc', fontSize: font.sm, marginTop: 2 },
+  payerCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  payerLabel: {
+    fontSize: font.sm,
+    fontWeight: font.bold,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: spacing.sm,
+  },
+  payerChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  payerChip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  payerChipActive: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  payerChipText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.textMuted },
+  payerChipTextActive: { color: colors.primaryDark },
+  payerHint: { fontSize: font.xs, color: colors.textFaint, marginTop: spacing.sm },
+  payRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  payBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primary,
+  },
+  payBtnText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.onPrimary },
+  paidToggle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 9,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  paidToggleActive: { backgroundColor: '#E4F4EE', borderColor: colors.success },
+  paidToggleText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.textMuted },
+  paidToggleTextActive: { color: colors.success },
   personCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
