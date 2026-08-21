@@ -339,7 +339,7 @@ export default function HistoryScreen({ navigation }) {
                 <Text style={styles.statLabel}>Поръчки</Text>
               </View>
               <View style={[styles.statTile, shadow.card]}>
-                <Text style={styles.statValue} numberOfLines={1}>
+                <Text style={styles.statValueSmall} numberOfLines={2}>
                   {charts.topDish ? charts.topDish.label : '—'}
                 </Text>
                 <Text style={styles.statLabel}>Топ ястие</Text>
@@ -503,7 +503,8 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingHorizontal: spacing.sm,
     alignItems: 'center',
   },
-  statValue: { fontSize: font.md, fontWeight: font.bold, color: colors.text },
+  statValue: { fontSize: font.md, fontWeight: font.bold, color: colors.text, textAlign: 'center' },
+  statValueSmall: { fontSize: font.sm, fontWeight: font.bold, color: colors.text, textAlign: 'center' },
   statLabel: { fontSize: font.xs, color: colors.textMuted, marginTop: 2, textAlign: 'center' },
 
   chartCard: {
