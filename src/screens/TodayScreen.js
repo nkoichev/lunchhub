@@ -68,6 +68,26 @@ export default function TodayScreen({ navigation }) {
     });
   };
 
+  // Totals per dish per restaurant — what to actually order/dictate by phone.
+  const orderSummary = useMemo(() => {
+    const byRestaurant = {};
+    people.forEach((p) => {
+      const rest = p.restaurantName || 'Без ресторант';
+      if (!byRestaurant[rest]) byRestaurant[rest] = {};
+      p.items.forEach((it) => {
+        byRestaurant[rest][it.name] = (byRestaurant[rest][it.name] || 0) + it.quantity;
+      });
+    });
+    return Object.entries(byRestaurant)
+      .map(([restaurantName, itemsMap]) => ({
+        restaurantName,
+        items: Object.entries(itemsMap)
+          .map(([name, quantity]) => ({ name, quantity }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => a.restaurantName.localeCompare(b.restaurantName));
+  }, [people]);
+
   // Distinct people (a person may have >1 order today).
   const peopleCount = new Set(people.map((p) => p.userId)).size;
   const distinctPeople = Object.values(
@@ -258,6 +278,21 @@ export default function TodayScreen({ navigation }) {
             );
           })}
           </View>
+
+          <View style={[styles.summaryCard, shadow.card]}>
+            <Text style={styles.payerLabel}>📞 Поръчка</Text>
+            {orderSummary.map((r) => (
+              <View key={r.restaurantName} style={styles.summaryRestaurant}>
+                <Text style={styles.summaryRestaurantName}>{r.restaurantName}</Text>
+                {r.items.map((it) => (
+                  <View key={it.name} style={styles.summaryRow}>
+                    <Text style={styles.summaryItemName}>{it.name}</Text>
+                    <Text style={styles.summaryQty}>×{it.quantity}</Text>
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
         </>
       )}
       </View>
@@ -284,6 +319,31 @@ const makeStyles = (colors) => StyleSheet.create({
   totalCardLabel: { color: '#ffffffcc', fontSize: font.sm, fontWeight: font.semibold, textTransform: 'uppercase', letterSpacing: 0.8 },
   totalCardValue: { color: colors.onPrimary, fontSize: font.xxl, fontWeight: font.bold, marginTop: 4 },
   totalCardSub: { color: '#ffffffcc', fontSize: font.sm, marginTop: 2 },
+  summaryCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  summaryRestaurant: { marginTop: spacing.sm },
+  summaryRestaurantName: {
+    fontSize: font.base,
+    fontWeight: font.bold,
+    color: colors.primary,
+    marginBottom: 2,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    paddingLeft: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  summaryItemName: { fontSize: font.base, color: colors.text, flex: 1, fontWeight: font.semibold },
+  summaryQty: { fontSize: font.base, color: colors.textMuted, fontWeight: font.bold },
   payerCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
