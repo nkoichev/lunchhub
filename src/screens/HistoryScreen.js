@@ -30,7 +30,7 @@ export default function HistoryScreen({ navigation }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [mode, setMode] = useState('orders'); // 'orders' | 'summary' | 'charts'
+  const [mode, setMode] = useState('charts'); // 'charts' | 'orders' | 'summary'
   const [rangeId, setRangeId] = useState('30');
 
   const load = useCallback(async () => {
@@ -116,6 +116,8 @@ export default function HistoryScreen({ navigation }) {
     const personTotals = {};
     // Historic item names differ in casing (e.g. "Кутия" vs "кутия") depending
     // on how the dish was typed at order time — normalize so they rank as one.
+    // "Кутия" itself is packaging, not a dish, so it's excluded here.
+    const NON_DISH_NAMES = new Set(['кутия']);
     const dishQty = {};
     const dishVariants = {};
     rangedOrders.forEach((o) => {
@@ -123,6 +125,7 @@ export default function HistoryScreen({ navigation }) {
       personTotals[o.userName] = (personTotals[o.userName] || 0) + o.total;
       o.items.forEach((it) => {
         const key = it.item_name.trim().toLowerCase();
+        if (NON_DISH_NAMES.has(key)) return;
         dishQty[key] = (dishQty[key] || 0) + it.quantity;
         const variants = (dishVariants[key] ??= {});
         variants[it.item_name] = (variants[it.item_name] || 0) + it.quantity;
@@ -177,6 +180,14 @@ export default function HistoryScreen({ navigation }) {
       <View style={styles.toggleWrap}>
         <View style={[styles.toggle, { maxWidth: readWidth, alignSelf: 'center', width: '100%' }]}>
           <TouchableOpacity
+            style={[styles.toggleBtn, mode === 'charts' && styles.toggleBtnActive]}
+            onPress={() => setMode('charts')}
+          >
+            <Text style={[styles.toggleText, mode === 'charts' && styles.toggleTextActive]}>
+              📊 Графики
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.toggleBtn, mode === 'orders' && styles.toggleBtnActive]}
             onPress={() => setMode('orders')}
           >
@@ -190,14 +201,6 @@ export default function HistoryScreen({ navigation }) {
           >
             <Text style={[styles.toggleText, mode === 'summary' && styles.toggleTextActive]}>
               Обобщено
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, mode === 'charts' && styles.toggleBtnActive]}
-            onPress={() => setMode('charts')}
-          >
-            <Text style={[styles.toggleText, mode === 'charts' && styles.toggleTextActive]}>
-              📊 Графики
             </Text>
           </TouchableOpacity>
         </View>
