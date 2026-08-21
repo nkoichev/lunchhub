@@ -5,9 +5,17 @@ import { fetchAllHistory, deleteOrder } from '../services/orderService';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { EmptyState } from '../components/ui';
+import RankBarChart from '../components/charts/RankBarChart';
+import TrendChart from '../components/charts/TrendChart';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
+
+const RANGE_OPTIONS = [
+  { id: '7', label: '7 дни', days: 7 },
+  { id: '30', label: '30 дни', days: 30 },
+  { id: 'all', label: 'Всички', days: null },
+];
 
 function formatDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -22,7 +30,8 @@ export default function HistoryScreen({ navigation }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [mode, setMode] = useState('orders'); // 'orders' | 'summary'
+  const [mode, setMode] = useState('orders'); // 'orders' | 'summary' | 'charts'
+  const [rangeId, setRangeId] = useState('30');
 
   const load = useCallback(async () => {
     try {
@@ -91,6 +100,69 @@ export default function HistoryScreen({ navigation }) {
     });
   }, [orders]);
 
+  // Orders inside the selected chart range (7 / 30 days / all time).
+  const rangedOrders = useMemo(() => {
+    const range = RANGE_OPTIONS.find((r) => r.id === rangeId);
+    if (!range?.days) return orders;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - range.days);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    return orders.filter((o) => o.date >= cutoffStr);
+  }, [orders, rangeId]);
+
+  // Rankings + trend for the "Графики" tab, built from the ranged/full history.
+  const charts = useMemo(() => {
+    const restaurantTotals = {};
+    const personTotals = {};
+    // Historic item names differ in casing (e.g. "Кутия" vs "кутия") depending
+    // on how the dish was typed at order time — normalize so they rank as one.
+    const dishQty = {};
+    const dishVariants = {};
+    rangedOrders.forEach((o) => {
+      restaurantTotals[o.restaurantName] = (restaurantTotals[o.restaurantName] || 0) + o.total;
+      personTotals[o.userName] = (personTotals[o.userName] || 0) + o.total;
+      o.items.forEach((it) => {
+        const key = it.item_name.trim().toLowerCase();
+        dishQty[key] = (dishQty[key] || 0) + it.quantity;
+        const variants = (dishVariants[key] ??= {});
+        variants[it.item_name] = (variants[it.item_name] || 0) + it.quantity;
+      });
+    });
+    const dishLabel = (key) =>
+      Object.entries(dishVariants[key]).sort((a, b) => b[1] - a[1])[0][0];
+    const toRanked = (map, labelFor = (key) => key) =>
+      Object.entries(map)
+        .map(([key, value]) => ({ label: labelFor(key), value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
+
+    const rankedDishes = toRanked(dishQty, dishLabel);
+    const topDish = rankedDishes[0];
+
+    // Fixed 14-day trend window, independent of the range chips above.
+    const byDate = {};
+    orders.forEach((o) => {
+      byDate[o.date] = (byDate[o.date] || 0) + o.total;
+    });
+    const dailyTotals = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      dailyTotals.push({ date: key, total: byDate[key] || 0 });
+    }
+
+    return {
+      byRestaurant: toRanked(restaurantTotals),
+      byPerson: toRanked(personTotals),
+      byDish: rankedDishes,
+      dailyTotals,
+      totalSpend: rangedOrders.reduce((s, o) => s + o.total, 0),
+      orderCount: rangedOrders.length,
+      topDish,
+    };
+  }, [rangedOrders, orders]);
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -118,6 +190,14 @@ export default function HistoryScreen({ navigation }) {
           >
             <Text style={[styles.toggleText, mode === 'summary' && styles.toggleTextActive]}>
               Обобщено
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, mode === 'charts' && styles.toggleBtnActive]}
+            onPress={() => setMode('charts')}
+          >
+            <Text style={[styles.toggleText, mode === 'charts' && styles.toggleTextActive]}>
+              📊 Графики
             </Text>
           </TouchableOpacity>
         </View>
@@ -189,7 +269,7 @@ export default function HistoryScreen({ navigation }) {
               })}
             </View>
           ))
-        ) : (
+        ) : mode === 'summary' ? (
           // ---------- SUMMARY ----------
           days.map((day) => (
             <View key={day.date} style={[styles.summaryCard, shadow.card]}>
@@ -227,6 +307,62 @@ export default function HistoryScreen({ navigation }) {
               })}
             </View>
           ))
+        ) : (
+          // ---------- CHARTS ----------
+          <>
+            <View style={styles.rangeChips}>
+              {RANGE_OPTIONS.map((r) => (
+                <TouchableOpacity
+                  key={r.id}
+                  onPress={() => setRangeId(r.id)}
+                  style={[styles.rangeChip, rangeId === r.id && styles.rangeChipActive]}
+                >
+                  <Text style={[styles.rangeChipText, rangeId === r.id && styles.rangeChipTextActive]}>
+                    {r.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.statsRow}>
+              <View style={[styles.statTile, shadow.card]}>
+                <Text style={styles.statValue}>
+                  {charts.totalSpend.toFixed(2)} {CURRENCY}
+                </Text>
+                <Text style={styles.statLabel}>Общо похарчено</Text>
+              </View>
+              <View style={[styles.statTile, shadow.card]}>
+                <Text style={styles.statValue}>{charts.orderCount}</Text>
+                <Text style={styles.statLabel}>Поръчки</Text>
+              </View>
+              <View style={[styles.statTile, shadow.card]}>
+                <Text style={styles.statValue} numberOfLines={1}>
+                  {charts.topDish ? charts.topDish.label : '—'}
+                </Text>
+                <Text style={styles.statLabel}>Топ ястие</Text>
+              </View>
+            </View>
+
+            <View style={[styles.chartCard, shadow.card]}>
+              <Text style={styles.chartTitle}>🏪 По ресторанти</Text>
+              <RankBarChart data={charts.byRestaurant} colors={colors} color={colors.primary} valueFormatter={(v) => `${v.toFixed(2)} ${CURRENCY}`} />
+            </View>
+
+            <View style={[styles.chartCard, shadow.card]}>
+              <Text style={styles.chartTitle}>👥 По хора</Text>
+              <RankBarChart data={charts.byPerson} colors={colors} color={colors.accent} valueFormatter={(v) => `${v.toFixed(2)} ${CURRENCY}`} />
+            </View>
+
+            <View style={[styles.chartCard, shadow.card]}>
+              <Text style={styles.chartTitle}>🍽️ По ястия (брой поръчани)</Text>
+              <RankBarChart data={charts.byDish} colors={colors} color={colors.primary} valueFormatter={(v) => `×${v}`} />
+            </View>
+
+            <View style={[styles.chartCard, shadow.card]}>
+              <Text style={styles.chartTitle}>📈 Последните 14 дни</Text>
+              <TrendChart days={charts.dailyTotals} colors={colors} />
+            </View>
+          </>
         )}
         </View>
       </ScrollView>
@@ -339,4 +475,41 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   sumName: { fontSize: font.base, color: colors.textMuted, flex: 1 },
   sumValue: { fontSize: font.base, fontWeight: font.semibold, color: colors.accent },
+
+  rangeChips: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  rangeChip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  rangeChipActive: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  rangeChipText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.textMuted },
+  rangeChipTextActive: { color: colors.primaryDark },
+
+  statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  statTile: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+  },
+  statValue: { fontSize: font.md, fontWeight: font.bold, color: colors.text },
+  statLabel: { fontSize: font.xs, color: colors.textMuted, marginTop: 2, textAlign: 'center' },
+
+  chartCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chartTitle: { fontSize: font.base, fontWeight: font.bold, color: colors.text, marginBottom: spacing.md },
 });
