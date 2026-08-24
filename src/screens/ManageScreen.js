@@ -135,9 +135,12 @@ export default function ManageScreen() {
         onConfirm: async () => {
           try {
             const result = await importSheetOrders(rows);
+            const skipWarn = result.skippedNoDate.length
+              ? `\n\n⚠️ Непозната дата, пропуснати: ${result.skippedNoDate.join(', ')}`
+              : '';
             alertMessage(
               'Готово',
-              `Нови поръчки: ${result.createdOrders}\nОбновени поръчки: ${result.updatedOrders}\nХора: ${result.people.join(', ')}`
+              `Нови поръчки: ${result.createdOrders}\nОбновени поръчки: ${result.updatedOrders}\nХора: ${result.people.join(', ')}${skipWarn}`
             );
           } catch (e) {
             alertMessage('Грешка при импорт', e.message);

@@ -61,15 +61,23 @@ function parseCsv(text) {
   return rows;
 }
 
+const MONTHS = {
+  january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+  july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+};
+
 // "Thursday, 20 August 2026 г. в 9:11: ч." -> "2026-08-20"
+// Built by hand (not via `new Date(string)`) because free-text date parsing
+// is implementation-defined and Hermes (React Native's JS engine) fails to
+// parse formats that work fine in Node/V8 during local testing.
 function parseSheetDate(raw) {
   const m = /(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/.exec(raw || '');
   if (!m) return null;
-  const d = new Date(`${m[2]} ${m[1]}, ${m[3]}`);
-  if (Number.isNaN(d.getTime())) return null;
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mm}-${dd}`;
+  const month = MONTHS[m[2].toLowerCase()];
+  if (month === undefined) return null;
+  const mm = String(month + 1).padStart(2, '0');
+  const dd = String(m[1]).padStart(2, '0');
+  return `${m[3]}-${mm}-${dd}`;
 }
 
 // Fetch + parse the sheet into { rows, unmappedRestaurants } without
@@ -207,5 +215,14 @@ export async function importSheetOrders(rows) {
     if (itemsErr) throw new Error(itemsErr.message);
   }
 
-  return { createdOrders: created, updatedOrders: updated, people: [...new Set(rows.map((r) => r.name))] };
+  const skippedNoRestaurant = new Set(rows.filter((r) => !r.restaurantId).map((r) => r.name));
+  const skippedNoDate = new Set(rows.filter((r) => r.restaurantId && !r.date).map((r) => r.name));
+
+  return {
+    createdOrders: created,
+    updatedOrders: updated,
+    people: [...new Set([...groups.values()].map((g) => g.name))],
+    skippedNoRestaurant: [...skippedNoRestaurant],
+    skippedNoDate: [...skippedNoDate],
+  };
 }
