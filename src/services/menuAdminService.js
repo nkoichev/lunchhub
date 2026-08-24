@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../config/supabase';
+import { estimateCalories } from './calorieService';
 
 // Turn a (possibly Cyrillic) name into a url-safe restaurant id.
 function slugify(name) {
@@ -47,7 +48,7 @@ export async function fetchDishes(restaurantId) {
   if (!isSupabaseConfigured || !restaurantId) return [];
   const { data, error } = await supabase
     .from('menu_items')
-    .select('id, name, price, category, day_index')
+    .select('id, name, price, category, day_index, calories')
     .eq('restaurant_id', restaurantId)
     .order('day_index', { ascending: true })
     .order('category', { ascending: true })
@@ -80,6 +81,7 @@ export async function addDish({ restaurantId, name, price, dayIndex, category })
   if (conflict) {
     throw new Error('Вече има ястие с това име за този ден. Редактирайте съществуващото вместо да добавяте ново.');
   }
+  const calories = await estimateCalories(name.trim(), category);
   const { data, error } = await supabase
     .from('menu_items')
     .insert({
@@ -88,8 +90,9 @@ export async function addDish({ restaurantId, name, price, dayIndex, category })
       price: Number(price) || 0,
       day_index: dayIndex,
       category,
+      calories,
     })
-    .select('id, name, price, category, day_index')
+    .select('id, name, price, category, day_index, calories')
     .single();
   if (error) throw new Error(error.message);
   return data;
@@ -97,22 +100,36 @@ export async function addDish({ restaurantId, name, price, dayIndex, category })
 
 export async function updateDish(id, { restaurantId, name, price, dayIndex, category }) {
   if (!isSupabaseConfigured) throw new Error('Базата данни не е настроена.');
-  if (!(name || '').trim()) throw new Error('Въведете име на ястие.');
+  const trimmedName = (name || '').trim();
+  if (!trimmedName) throw new Error('Въведете име на ястие.');
   if (restaurantId) {
     const conflict = await findConflictingDish({ restaurantId, name, dayIndex, excludeId: id });
     if (conflict) {
       throw new Error('Вече има друго ястие с това име за този ден.');
     }
   }
-  const { error } = await supabase
+
+  const patch = {
+    name: trimmedName,
+    price: Number(price) || 0,
+    day_index: dayIndex,
+    category,
+  };
+
+  // Only re-estimate (and only overwrite) if the dish's identity actually
+  // changed — avoids wiping a good existing estimate on a failed/rate-
+  // limited call, and avoids a needless API call on every price/day edit.
+  const { data: current } = await supabase
     .from('menu_items')
-    .update({
-      name: name.trim(),
-      price: Number(price) || 0,
-      day_index: dayIndex,
-      category,
-    })
-    .eq('id', id);
+    .select('name, category')
+    .eq('id', id)
+    .maybeSingle();
+  if (!current || current.name !== trimmedName || current.category !== category) {
+    const calories = await estimateCalories(trimmedName, category);
+    if (calories !== null) patch.calories = calories;
+  }
+
+  const { error } = await supabase.from('menu_items').update(patch).eq('id', id);
   if (error) throw new Error(error.message);
 }
 
