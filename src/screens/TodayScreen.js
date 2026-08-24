@@ -75,14 +75,22 @@ export default function TodayScreen({ navigation }) {
       const rest = p.restaurantName || 'Без ресторант';
       if (!byRestaurant[rest]) byRestaurant[rest] = {};
       p.items.forEach((it) => {
-        byRestaurant[rest][it.name] = (byRestaurant[rest][it.name] || 0) + it.quantity;
+        if (!byRestaurant[rest][it.name]) {
+          byRestaurant[rest][it.name] = { quantity: 0, names: new Set() };
+        }
+        byRestaurant[rest][it.name].quantity += it.quantity;
+        byRestaurant[rest][it.name].names.add(p.name);
       });
     });
     return Object.entries(byRestaurant)
       .map(([restaurantName, itemsMap]) => ({
         restaurantName,
         items: Object.entries(itemsMap)
-          .map(([name, quantity]) => ({ name, quantity }))
+          .map(([name, { quantity, names }]) => ({
+            name,
+            quantity,
+            names: [...names].sort((a, b) => a.localeCompare(b)),
+          }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       }))
       .sort((a, b) => a.restaurantName.localeCompare(b.restaurantName));
@@ -288,6 +296,7 @@ export default function TodayScreen({ navigation }) {
                   <View key={it.name} style={styles.summaryRow}>
                     <Text style={styles.summaryItemName}>{it.name}</Text>
                     <Text style={styles.summaryQty}>×{it.quantity}</Text>
+                    <Text style={styles.summaryNames}>{it.names.join(', ')}</Text>
                   </View>
                 ))}
               </View>
@@ -336,14 +345,15 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   summaryRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingVertical: 4,
     paddingLeft: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  summaryItemName: { fontSize: font.base, color: colors.text, flex: 1, fontWeight: font.semibold },
-  summaryQty: { fontSize: font.base, color: colors.textMuted, fontWeight: font.bold },
+  summaryItemName: { fontSize: font.base, color: colors.text, flex: 1.2, fontWeight: font.semibold },
+  summaryQty: { fontSize: font.base, color: colors.textMuted, fontWeight: font.bold, flex: 0.4, textAlign: 'center' },
+  summaryNames: { fontSize: font.sm, color: colors.textMuted, flex: 1.4, textAlign: 'right' },
   payerCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
