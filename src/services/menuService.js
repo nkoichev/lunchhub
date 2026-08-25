@@ -15,7 +15,7 @@ export async function fetchMenu(restaurantId, dayIndex) {
 
   const { data: items, error } = await supabase
     .from('menu_items')
-    .select('id, name, price, category, day_index')
+    .select('id, name, price, category, day_index, calories')
     .eq('restaurant_id', rid)
     .or(`day_index.eq.${dayIndex},day_index.eq.0`)
     .order('category', { ascending: true })

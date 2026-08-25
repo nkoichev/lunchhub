@@ -114,6 +114,7 @@ export default function MenuScreen({ navigation }) {
             <Text style={styles.price}>
               {item.price.toFixed(2)} {CURRENCY}
             </Text>
+            {item.calories ? <Text style={styles.calories}>🔥 {item.calories} ккал</Text> : null}
             {item.avg_stars ? (
               <View style={styles.ratingInline}>
                 <StarRating value={item.avg_stars} size={13} />
@@ -382,6 +383,7 @@ const makeStyles = (colors) => StyleSheet.create({
   dishName: { fontSize: font.md, fontWeight: font.semibold, color: colors.text },
   dishMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: spacing.md },
   price: { fontSize: font.base, fontWeight: font.bold, color: colors.accent },
+  calories: { fontSize: font.xs, color: colors.textFaint },
   ratingInline: { flexDirection: 'row', alignItems: 'center' },
   votes: { fontSize: font.xs, color: colors.textFaint, marginLeft: 3 },
   noRating: { fontSize: font.xs, color: colors.textFaint },
