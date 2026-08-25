@@ -20,6 +20,9 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   process.exit(1);
 }
 
+// PostgREST returns 204 No Content (empty body) for a PATCH by default, so
+// this can't unconditionally call res.json() — only parse when there's
+// actually a body.
 async function supabaseFetch(path, init) {
   const res = await fetch(`${SUPABASE_URL}${path}`, {
     ...init,
@@ -30,8 +33,9 @@ async function supabaseFetch(path, init) {
       ...(init?.headers || {}),
     },
   });
-  if (!res.ok) throw new Error(`${path} -> ${res.status}: ${await res.text()}`);
-  return res.json();
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${path} -> ${res.status}: ${text}`);
+  return text ? JSON.parse(text) : null;
 }
 
 async function estimateCalories(name, category) {
@@ -44,8 +48,9 @@ async function estimateCalories(name, category) {
     },
     body: JSON.stringify({ name, category }),
   });
-  if (!res.ok) throw new Error(`estimate-calories -> ${res.status}: ${await res.text()}`);
-  const data = await res.json();
+  const text = await res.text();
+  if (!res.ok) throw new Error(`estimate-calories -> ${res.status}: ${text}`);
+  const data = text ? JSON.parse(text) : {};
   return Number.isFinite(data.calories) ? data.calories : null;
 }
 

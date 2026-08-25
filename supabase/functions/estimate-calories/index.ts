@@ -12,7 +12,10 @@ const corsHeaders = {
 };
 
 const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY');
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_KEY}`;
+// flash-lite instead of full flash: much higher free-tier daily quota, and
+// this task (a rough calorie guess from a dish name) doesn't need the
+// bigger model's reasoning power.
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${GEMINI_KEY}`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
