@@ -80,8 +80,9 @@ async function main() {
       failed++;
       console.warn(`  ✗ ${dish.name} — ${e.message}`);
     }
-    // Stay well under the free-tier rate limit.
-    await new Promise((r) => setTimeout(r, 1500));
+    // Free tier is 15 requests/minute (not per-day, despite the quotaId
+    // name) — 4.5s keeps us under that with margin.
+    await new Promise((r) => setTimeout(r, 4500));
   }
 
   console.log(`\nDone: ${done} updated, ${failed} failed.`);
