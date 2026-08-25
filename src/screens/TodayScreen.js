@@ -230,9 +230,14 @@ export default function TodayScreen({ navigation }) {
                       <Text style={styles.personRest}>{p.restaurantName}</Text>
                     ) : null}
                   </View>
-                  <Text style={styles.personTotal}>
-                    {p.total.toFixed(2)} {CURRENCY}
-                  </Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.personTotal}>
+                      {p.total.toFixed(2)} {CURRENCY}
+                    </Text>
+                    {p.totalCalories > 0 && (
+                      <Text style={styles.personCalories}>🔥 {p.totalCalories} ккал</Text>
+                    )}
+                  </View>
                 </View>
                 {p.items.map((it, idx) => (
                   <View key={idx} style={styles.itemRow}>
@@ -432,6 +437,7 @@ const makeStyles = (colors) => StyleSheet.create({
   personName: { fontSize: font.md, fontWeight: font.bold, color: colors.text },
   personRest: { fontSize: font.xs, color: colors.primary, fontWeight: font.semibold, marginTop: 1 },
   personTotal: { fontSize: font.md, fontWeight: font.bold, color: colors.accent },
+  personCalories: { fontSize: font.xs, color: colors.textFaint, marginTop: 1 },
   itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

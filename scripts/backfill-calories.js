@@ -55,9 +55,11 @@ async function estimateCalories(name, category) {
 }
 
 async function main() {
-  const dishes = await supabaseFetch(
+  const NON_FOOD_NAMES = new Set(['кутия']);
+  const allDishes = await supabaseFetch(
     '/rest/v1/menu_items?calories=is.null&select=id,name,category'
   );
+  const dishes = allDishes.filter((d) => !NON_FOOD_NAMES.has(d.name.trim().toLowerCase()));
   console.log(`${dishes.length} dish(es) without a calorie estimate.`);
 
   let done = 0;

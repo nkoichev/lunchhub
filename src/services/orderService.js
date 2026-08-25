@@ -192,10 +192,21 @@ export async function deleteOrder(orderId) {
 export async function fetchTodaySummary() {
   if (!isSupabaseConfigured) return { people: [], grandTotal: 0 };
 
-  const { data, error } = await supabase
-    .from('today_orders')
-    .select('client, user_id, total, item_name, quantity, line_total, order_id, restaurant_name, revolut_tag, is_paid');
+  const [{ data, error }, { data: menuItems }] = await Promise.all([
+    supabase
+      .from('today_orders')
+      .select('client, user_id, total, item_name, quantity, line_total, order_id, restaurant_name, revolut_tag, is_paid'),
+    supabase.from('menu_items').select('name, calories').not('calories', 'is', null),
+  ]);
   if (error) throw new Error(error.message);
+
+  // Dish names aren't a foreign key on order_items, so calories are looked
+  // up by normalized name rather than joined — same reasoning as the
+  // History charts' dish grouping (item names vary in casing over time).
+  const caloriesByName = {};
+  (menuItems || []).forEach((m) => {
+    caloriesByName[m.name.trim().toLowerCase()] = m.calories;
+  });
 
   const map = {};
   let grandTotal = 0;
@@ -208,6 +219,7 @@ export async function fetchTodaySummary() {
         userId: row.user_id,
         items: [],
         total: 0,
+        totalCalories: 0,
         orderId: row.order_id,
         restaurantName: row.restaurant_name,
         revolutTag: row.revolut_tag,
@@ -220,6 +232,8 @@ export async function fetchTodaySummary() {
       lineTotal: Number(row.line_total),
     });
     map[key].total += Number(row.line_total);
+    const calories = caloriesByName[row.item_name.trim().toLowerCase()];
+    if (calories) map[key].totalCalories += calories * row.quantity;
     grandTotal += Number(row.line_total);
   });
 
