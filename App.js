@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, Platform, Pressable } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, ActivityIndicator, Platform, Pressable, Animated, Easing } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -52,40 +52,109 @@ const TAB_ICON = {
   Manage: '📝',
 };
 
-function TabIcon({ route, focused }) {
-  return (
-    <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>
-      {TAB_ICON[route.name]}
-    </Text>
-  );
-}
+// Fully custom tab bar (rather than tabBarIcon/tabBarButton screenOptions)
+// so the selection pill can be a single Animated.View that slides and
+// resizes to the active tab, instead of each tab drawing its own static
+// border — wrapping the default per-item content in a border made icon and
+// label overlap because it fought the default renderer's own layout.
+function AnimatedTabBar({ state, descriptors, navigation, colors }) {
+  const [layouts, setLayouts] = useState({});
+  const indicatorX = useRef(new Animated.Value(0)).current;
+  const indicatorW = useRef(new Animated.Value(0)).current;
 
-// Wraps the default tab content in a pill that's outlined + tinted only when
-// selected — the icon-opacity/label-color difference alone was too subtle to
-// tell which tab is active at a glance.
-function TabButton({ children, onPress, onLongPress, accessibilityState, style, colors }) {
-  const focused = !!accessibilityState?.selected;
+  useEffect(() => {
+    const l = layouts[state.index];
+    if (!l) return;
+    const config = {
+      duration: 320,
+      easing: Easing.out(Easing.back(1.4)),
+      useNativeDriver: false,
+    };
+    Animated.timing(indicatorX, { ...config, toValue: l.x + 4 }).start();
+    Animated.timing(indicatorW, { ...config, toValue: l.width - 8 }).start();
+  }, [state.index, layouts]);
+
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      style={[style, { alignItems: 'center', justifyContent: 'center' }]}
+    <View
+      style={{
+        flexDirection: 'row',
+        backgroundColor: colors.surface,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+        height: 62,
+        paddingTop: 6,
+        paddingBottom: 8,
+      }}
     >
-      <View
+      <Animated.View
+        pointerEvents="none"
         style={{
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingHorizontal: 12,
-          paddingVertical: 4,
-          borderRadius: 12,
+          position: 'absolute',
+          top: 2,
+          bottom: 2,
+          borderRadius: 14,
           borderWidth: 1.5,
-          borderColor: focused ? colors.primary : 'transparent',
-          backgroundColor: focused ? colors.primaryLight : 'transparent',
+          borderColor: colors.primary,
+          backgroundColor: colors.primaryLight,
+          transform: [{ translateX: indicatorX }],
+          width: indicatorW,
         }}
-      >
-        {children}
-      </View>
-    </Pressable>
+      />
+      {state.routes.map((route, index) => {
+        const { options } = descriptors[route.key];
+        const focused = state.index === index;
+        const badge = options.tabBarBadge;
+
+        const onPress = () => {
+          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+        };
+
+        return (
+          <Pressable
+            key={route.key}
+            onPress={onPress}
+            onLayout={(e) => {
+              const { x, width } = e.nativeEvent.layout;
+              setLayouts((prev) => ({ ...prev, [index]: { x, width } }));
+            }}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{TAB_ICON[route.name]}</Text>
+              {badge ? (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -10,
+                    minWidth: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    paddingHorizontal: 3,
+                    backgroundColor: colors.primary,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 10, fontWeight: font.semibold, color: '#fff' }}>{badge}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: font.semibold,
+                marginTop: 2,
+                color: focused ? colors.primary : colors.textFaint,
+              }}
+            >
+              {options.title ?? route.name}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -116,21 +185,8 @@ function MainTabs() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <AppHeader />
       <Tab.Navigator
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: colors.textFaint,
-          tabBarLabelStyle: { fontSize: 11, fontWeight: font.semibold },
-          tabBarStyle: {
-            backgroundColor: colors.surface,
-            borderTopColor: colors.border,
-            height: 62,
-            paddingBottom: 8,
-            paddingTop: 6,
-          },
-          tabBarIcon: ({ focused }) => <TabIcon route={route} focused={focused} />,
-          tabBarButton: (props) => <TabButton {...props} colors={colors} />,
-        })}
+        screenOptions={{ headerShown: false }}
+        tabBar={(props) => <AnimatedTabBar {...props} colors={colors} />}
       >
         <Tab.Screen
           name="MenuTab"
@@ -138,7 +194,6 @@ function MainTabs() {
           options={{
             title: 'Меню',
             tabBarBadge: count > 0 ? count : undefined,
-            tabBarBadgeStyle: { backgroundColor: colors.primary },
           }}
         />
         <Tab.Screen name="Today" component={TodayScreen} options={{ title: 'Днес' }} />
