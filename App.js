@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, ActivityIndicator, Platform, Pressable } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -60,6 +60,35 @@ function TabIcon({ route, focused }) {
   );
 }
 
+// Wraps the default tab content in a pill that's outlined + tinted only when
+// selected — the icon-opacity/label-color difference alone was too subtle to
+// tell which tab is active at a glance.
+function TabButton({ children, onPress, onLongPress, accessibilityState, style, colors }) {
+  const focused = !!accessibilityState?.selected;
+  return (
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={[style, { alignItems: 'center', justifyContent: 'center' }]}
+    >
+      <View
+        style={{
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 12,
+          paddingVertical: 4,
+          borderRadius: 12,
+          borderWidth: 1.5,
+          borderColor: focused ? colors.primary : 'transparent',
+          backgroundColor: focused ? colors.primaryLight : 'transparent',
+        }}
+      >
+        {children}
+      </View>
+    </Pressable>
+  );
+}
+
 // Menu tab is itself a stack so it can push the Cart screen.
 function MenuStack() {
   const { colors } = useTheme();
@@ -100,6 +129,7 @@ function MainTabs() {
             paddingTop: 6,
           },
           tabBarIcon: ({ focused }) => <TabIcon route={route} focused={focused} />,
+          tabBarButton: (props) => <TabButton {...props} colors={colors} />,
         })}
       >
         <Tab.Screen
