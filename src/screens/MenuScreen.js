@@ -12,6 +12,7 @@ import {
 import { useCart } from '../context/CartContext';
 import { useRestaurant } from '../context/RestaurantContext';
 import { useTheme } from '../context/ThemeContext';
+import { useDensity } from '../context/DensityContext';
 import { fetchMenu } from '../services/menuService';
 import { confirmDialog } from '../utils/confirm';
 import { StarRating, EmptyState } from '../components/ui';
@@ -29,7 +30,9 @@ export default function MenuScreen({ navigation }) {
   const { qtyOf, add, decrement, count, total, clear, list } = useCart();
   const { restaurants, selected, setSelected } = useRestaurant();
   const { colors, shadow } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { densityId, scale } = useDensity();
+  const isCompact = densityId === 'compact';
+  const styles = useMemo(() => makeStyles(colors, scale), [colors, scale]);
   const { columns, maxWidth, isWide } = useResponsive();
   const [day, setDay] = useState(() => {
     const t = todayIndex();
@@ -114,7 +117,7 @@ export default function MenuScreen({ navigation }) {
             <Text style={styles.price}>
               {item.price.toFixed(2)} {CURRENCY}
             </Text>
-            {item.calories ? <Text style={styles.calories}>🔥 {item.calories} ккал</Text> : null}
+            {item.calories && !isCompact ? <Text style={styles.calories}>🔥 {item.calories} ккал</Text> : null}
             {item.avg_stars ? (
               <View style={styles.ratingInline}>
                 <StarRating value={item.avg_stars} size={13} />
@@ -274,7 +277,9 @@ export default function MenuScreen({ navigation }) {
   );
 }
 
-const makeStyles = (colors) => StyleSheet.create({
+const makeStyles = (colors, scale = 1) => {
+  const s = (v) => Math.max(2, Math.round(v * scale));
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   barWrap: {
@@ -366,16 +371,16 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
+    marginTop: s(spacing.lg),
+    marginBottom: s(spacing.sm),
   },
   dish: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    padding: s(spacing.lg),
+    marginBottom: s(spacing.sm),
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -431,4 +436,5 @@ const makeStyles = (colors) => StyleSheet.create({
   cartBadgeText: { color: colors.primary, fontWeight: font.bold, fontSize: font.sm },
   cartBarText: { flex: 1, color: colors.onPrimary, fontSize: font.md, fontWeight: font.semibold, marginLeft: spacing.md },
   cartBarTotal: { color: colors.onPrimary, fontSize: font.md, fontWeight: font.bold },
-});
+  });
+};

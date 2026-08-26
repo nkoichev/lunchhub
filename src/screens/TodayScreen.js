@@ -5,6 +5,7 @@ import { fetchTodaySummary, deleteOrder, todayDateString } from '../services/ord
 import { fetchDayPayer, setDayPayer, markOrderPaid } from '../services/paymentService';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useDensity } from '../context/DensityContext';
 import { EmptyState, Badge } from '../components/ui';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
@@ -13,7 +14,9 @@ import { spacing, radius, font, CURRENCY } from '../theme/theme';
 export default function TodayScreen({ navigation }) {
   const { user } = useAuth();
   const { colors, shadow } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { densityId, scale } = useDensity();
+  const isCompact = densityId === 'compact';
+  const styles = useMemo(() => makeStyles(colors, scale), [colors, scale]);
   const { columns, maxWidth } = useResponsive();
   const [people, setPeople] = useState([]);
   const [grandTotal, setGrandTotal] = useState(0);
@@ -234,7 +237,7 @@ export default function TodayScreen({ navigation }) {
                     <Text style={styles.personTotal}>
                       {p.total.toFixed(2)} {CURRENCY}
                     </Text>
-                    {p.totalCalories > 0 && (
+                    {p.totalCalories > 0 && !isCompact && (
                       <Text style={styles.personCalories}>🔥 {p.totalCalories} ккал</Text>
                     )}
                   </View>
@@ -314,7 +317,9 @@ export default function TodayScreen({ navigation }) {
   );
 }
 
-const makeStyles = (colors) => StyleSheet.create({
+const makeStyles = (colors, scale = 1) => {
+  const s = (v) => Math.max(2, Math.round(v * scale));
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   grid: {
@@ -326,8 +331,8 @@ const makeStyles = (colors) => StyleSheet.create({
   totalCard: {
     backgroundColor: colors.primary,
     borderRadius: radius.lg,
-    padding: spacing.xl,
-    marginBottom: spacing.lg,
+    padding: s(spacing.xl),
+    marginBottom: s(spacing.lg),
     alignItems: 'center',
   },
   totalCardLabel: { color: '#ffffffcc', fontSize: font.sm, fontWeight: font.semibold, textTransform: 'uppercase', letterSpacing: 0.8 },
@@ -336,8 +341,8 @@ const makeStyles = (colors) => StyleSheet.create({
   summaryCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
+    padding: s(spacing.lg),
+    marginBottom: s(spacing.lg),
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -351,7 +356,7 @@ const makeStyles = (colors) => StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingVertical: 4,
+    paddingVertical: s(4),
     paddingLeft: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -362,8 +367,8 @@ const makeStyles = (colors) => StyleSheet.create({
   payerCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
+    padding: s(spacing.lg),
+    marginBottom: s(spacing.lg),
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -417,13 +422,13 @@ const makeStyles = (colors) => StyleSheet.create({
   personCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    padding: s(spacing.lg),
+    marginBottom: s(spacing.sm),
     borderWidth: 1,
     borderColor: colors.border,
   },
   myCard: { borderColor: colors.primary, borderWidth: 1.5 },
-  personHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
+  personHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: s(spacing.sm) },
   avatar: {
     width: 34,
     height: 34,
@@ -441,7 +446,7 @@ const makeStyles = (colors) => StyleSheet.create({
   itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 4,
+    paddingVertical: s(4),
     paddingLeft: 46,
   },
   itemName: { fontSize: font.base, color: colors.textMuted, flex: 1 },
@@ -462,4 +467,5 @@ const makeStyles = (colors) => StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   actionText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.text },
-});
+  });
+};

@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { CartProvider, useCart } from './src/context/CartContext';
 import { RestaurantProvider } from './src/context/RestaurantContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { DensityProvider } from './src/context/DensityContext';
 import AppHeader from './src/components/AppHeader';
 
 import PinGateScreen from './src/screens/PinGateScreen';
@@ -285,7 +286,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <AppShell />
+        <DensityProvider>
+          <AppShell />
+        </DensityProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
