@@ -46,6 +46,37 @@ function sofiaDayIndex(): number {
   return map[weekday] ?? 0;
 }
 
+// Best-effort push to every registered device once the day's menu is in —
+// mirrors notifyOrderPlaced in src/services/pushService.js, but server-side
+// (no client is involved in this import), so it hits Expo's push API
+// directly instead of going through the send-push relay (that relay only
+// exists to work around browser CORS, which doesn't apply here).
+// deno-lint-ignore no-explicit-any
+async function notifyMenuUploaded(supabase: any) {
+  try {
+    const { data: tokens } = await supabase.from('push_tokens').select('token');
+    if (!tokens?.length) return;
+
+    const messages = tokens.map((t: { token: string }) => ({
+      to: t.token,
+      title: '🍽️ Ново меню от Щастливеца',
+      body: 'Днешното обедно меню вече е в приложението.',
+      sound: 'default',
+    }));
+
+    // Expo caps batches at 100 messages per request.
+    for (let i = 0; i < messages.length; i += 100) {
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(messages.slice(i, i + 100)),
+      });
+    }
+  } catch (_e) {
+    // Never fail the menu import over a notification hiccup.
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -152,6 +183,8 @@ Return every item, in the order they appear.`;
 
     const { error: insertError } = await supabase.from('menu_items').insert(rows);
     if (insertError) throw new Error(insertError.message);
+
+    await notifyMenuUploaded(supabase);
 
     return new Response(JSON.stringify({ dayIndex, inserted: rows.length, items: rows.map((r) => r.name) }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
