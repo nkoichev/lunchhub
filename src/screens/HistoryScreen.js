@@ -118,8 +118,8 @@ export default function HistoryScreen({ navigation }) {
     const personTotals = {};
     // Historic item names differ in casing (e.g. "Кутия" vs "кутия") depending
     // on how the dish was typed at order time — normalize so they rank as one.
-    // "Кутия" itself is packaging, not a dish, so it's excluded here.
-    const NON_DISH_NAMES = new Set(['кутия']);
+    // "Кутия" and bread slices are packaging/sides, not dishes, so they're excluded here.
+    const NON_DISH_NAMES = new Set(['кутия', 'хляб филия', 'филия хляб']);
     const dishQty = {};
     const dishVariants = {};
     rangedOrders.forEach((o) => {
@@ -195,7 +195,7 @@ export default function HistoryScreen({ navigation }) {
 
   // Per-day dish breakdown + top-dish ranking for the selected person.
   const personCharts = useMemo(() => {
-    const NON_DISH_NAMES = new Set(['кутия']);
+    const NON_DISH_NAMES = new Set(['кутия', 'хляб филия', 'филия хляб']);
     const byDate = new Map();
     const dishQty = {};
     const dishVariants = {};
@@ -228,17 +228,19 @@ export default function HistoryScreen({ navigation }) {
           .sort((a, b) => b.qty - a.qty),
       }));
 
-    const rankedDishes = Object.entries(dishQty)
+    const dishArr = Object.entries(dishQty)
       .map(([key, value]) => ({ label: dishLabel(key), value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
+      .sort((a, b) => b.value - a.value);
+    const rankedDishes = dishArr.slice(0, 8);
+    const topValue = dishArr[0]?.value;
+    const topDishes = dishArr.filter((d) => d.value === topValue);
 
     return {
       days,
       rankedDishes,
       totalSpend,
       orderCount: personRangedOrders.length,
-      topDish: rankedDishes[0],
+      topDishes,
     };
   }, [personRangedOrders]);
 
@@ -453,10 +455,14 @@ export default function HistoryScreen({ navigation }) {
                     <Text style={styles.statLabel}>Поръчки</Text>
                   </View>
                   <View style={[styles.statTile, shadow.card]}>
-                    <Text style={styles.statValueSmall} numberOfLines={2}>
-                      {personCharts.topDish ? personCharts.topDish.label : '—'}
+                    <Text style={styles.statValueSmall} numberOfLines={3}>
+                      {personCharts.topDishes.length
+                        ? personCharts.topDishes.map((d) => d.label).join(', ')
+                        : '—'}
                     </Text>
-                    <Text style={styles.statLabel}>Топ ястие</Text>
+                    <Text style={styles.statLabel}>
+                      {personCharts.topDishes.length > 1 ? 'Топ ястия' : 'Топ ястие'}
+                    </Text>
                   </View>
                 </View>
 
