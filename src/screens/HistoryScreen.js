@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import { EmptyState } from '../components/ui';
 import RankBarChart from '../components/charts/RankBarChart';
 import TrendChart from '../components/charts/TrendChart';
+import PersonDishChart from '../components/charts/PersonDishChart';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
@@ -30,8 +31,9 @@ export default function HistoryScreen({ navigation }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [mode, setMode] = useState('charts'); // 'charts' | 'orders' | 'summary'
+  const [mode, setMode] = useState('charts'); // 'charts' | 'orders' | 'summary' | 'person'
   const [rangeId, setRangeId] = useState('30');
+  const [personId, setPersonId] = useState(() => user?.id ?? null);
 
   const load = useCallback(async () => {
     try {
@@ -166,6 +168,80 @@ export default function HistoryScreen({ navigation }) {
     };
   }, [rangedOrders, orders]);
 
+  // Everyone who has ordered at least once, for the "По човек" picker.
+  const people = useMemo(() => {
+    const map = new Map();
+    orders.forEach((o) => {
+      if (!map.has(o.userId)) map.set(o.userId, o.userName);
+    });
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [orders]);
+
+  // Selected person's orders within the chosen range, oldest first (for the day chart).
+  const personRangedOrders = useMemo(() => {
+    if (!personId) return [];
+    const range = RANGE_OPTIONS.find((r) => r.id === rangeId);
+    let list = orders.filter((o) => o.userId === personId);
+    if (range?.days) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - range.days);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      list = list.filter((o) => o.date >= cutoffStr);
+    }
+    return list;
+  }, [orders, personId, rangeId]);
+
+  // Per-day dish breakdown + top-dish ranking for the selected person.
+  const personCharts = useMemo(() => {
+    const NON_DISH_NAMES = new Set(['кутия']);
+    const byDate = new Map();
+    const dishQty = {};
+    const dishVariants = {};
+    let totalSpend = 0;
+
+    personRangedOrders.forEach((o) => {
+      totalSpend += o.total;
+      if (!byDate.has(o.date)) byDate.set(o.date, { date: o.date, total: 0, items: {} });
+      const day = byDate.get(o.date);
+      day.total += o.total;
+      o.items.forEach((it) => {
+        const key = it.item_name.trim().toLowerCase();
+        if (NON_DISH_NAMES.has(key)) return;
+        day.items[key] = (day.items[key] || 0) + it.quantity;
+        dishQty[key] = (dishQty[key] || 0) + it.quantity;
+        const variants = (dishVariants[key] ??= {});
+        variants[it.item_name] = (variants[it.item_name] || 0) + it.quantity;
+      });
+    });
+
+    const dishLabel = (key) => Object.entries(dishVariants[key]).sort((a, b) => b[1] - a[1])[0][0];
+
+    const days = Array.from(byDate.values())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((d) => ({
+        date: d.date,
+        total: d.total,
+        items: Object.entries(d.items)
+          .map(([key, qty]) => ({ name: dishLabel(key), qty }))
+          .sort((a, b) => b.qty - a.qty),
+      }));
+
+    const rankedDishes = Object.entries(dishQty)
+      .map(([key, value]) => ({ label: dishLabel(key), value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+
+    return {
+      days,
+      rankedDishes,
+      totalSpend,
+      orderCount: personRangedOrders.length,
+      topDish: rankedDishes[0],
+    };
+  }, [personRangedOrders]);
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -201,6 +277,14 @@ export default function HistoryScreen({ navigation }) {
           >
             <Text style={[styles.toggleText, mode === 'summary' && styles.toggleTextActive]}>
               Обобщено
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, mode === 'person' && styles.toggleBtnActive]}
+            onPress={() => setMode('person')}
+          >
+            <Text style={[styles.toggleText, mode === 'person' && styles.toggleTextActive]}>
+              👤 По човек
             </Text>
           </TouchableOpacity>
         </View>
@@ -310,6 +394,89 @@ export default function HistoryScreen({ navigation }) {
               })}
             </View>
           ))
+        ) : mode === 'person' ? (
+          // ---------- PER PERSON ----------
+          <>
+            <View style={styles.peopleWrap}>
+              {people.map((p) => {
+                const active = p.id === personId;
+                const isMe = user && p.id === user.id;
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    onPress={() => setPersonId(p.id)}
+                    style={[styles.personChip, active && styles.personChipActive]}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.personChipText, active && styles.personChipTextActive]}
+                    >
+                      {p.name}
+                      {isMe ? ' (аз)' : ''}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.rangeChips}>
+              {RANGE_OPTIONS.map((r) => (
+                <TouchableOpacity
+                  key={r.id}
+                  onPress={() => setRangeId(r.id)}
+                  style={[styles.rangeChip, rangeId === r.id && styles.rangeChipActive]}
+                >
+                  <Text style={[styles.rangeChipText, rangeId === r.id && styles.rangeChipTextActive]}>
+                    {r.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {!personId || personCharts.days.length === 0 ? (
+              <EmptyState
+                emoji="👤"
+                title="Няма поръчки"
+                subtitle="Този човек няма поръчки в избрания период."
+              />
+            ) : (
+              <>
+                <View style={styles.statsRow}>
+                  <View style={[styles.statTile, shadow.card]}>
+                    <Text style={styles.statValue}>
+                      {personCharts.totalSpend.toFixed(2)} {CURRENCY}
+                    </Text>
+                    <Text style={styles.statLabel}>Общо похарчено</Text>
+                  </View>
+                  <View style={[styles.statTile, shadow.card]}>
+                    <Text style={styles.statValue}>{personCharts.orderCount}</Text>
+                    <Text style={styles.statLabel}>Поръчки</Text>
+                  </View>
+                  <View style={[styles.statTile, shadow.card]}>
+                    <Text style={styles.statValueSmall} numberOfLines={2}>
+                      {personCharts.topDish ? personCharts.topDish.label : '—'}
+                    </Text>
+                    <Text style={styles.statLabel}>Топ ястие</Text>
+                  </View>
+                </View>
+
+                <View style={[styles.chartCard, shadow.card]}>
+                  <Text style={styles.chartTitle}>📅 Поръчки по дни</Text>
+                  <PersonDishChart days={personCharts.days} colors={colors} />
+                </View>
+
+                <View style={[styles.chartCard, shadow.card]}>
+                  <Text style={styles.chartTitle}>🍽️ Топ ястия</Text>
+                  <RankBarChart
+                    data={personCharts.rankedDishes}
+                    colors={colors}
+                    color={colors.accent}
+                    valueFormatter={(v) => `×${v}`}
+                  />
+                </View>
+              </>
+            )}
+          </>
         ) : (
           // ---------- CHARTS ----------
           <>
@@ -478,6 +645,19 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   sumName: { fontSize: font.base, color: colors.textMuted, flex: 1 },
   sumValue: { fontSize: font.base, fontWeight: font.semibold, color: colors.accent },
+
+  peopleWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+  personChip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  personChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  personChipText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.textMuted },
+  personChipTextActive: { color: colors.onPrimary },
 
   rangeChips: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   rangeChip: {
