@@ -114,6 +114,9 @@ create table if not exists public.daily_steps (
   user_id    uuid not null references public.users(id) on delete cascade,
   step_date  date not null default current_date,
   steps      int  not null default 0 check (steps >= 0 and steps <= 300000),
+  -- 'manual' (typed in the app) or 'device' (auto-synced from Health
+  -- Connect). A manual entry is never overwritten by a later device sync.
+  source     text not null default 'manual' check (source in ('manual', 'device')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, step_date)

@@ -95,10 +95,12 @@ export default function StepsScreen() {
   };
 
   // The current user's saved entry for the day being edited.
-  const myEntryForEditDate = useMemo(() => {
-    const r = rows.find((x) => x.userId === user?.id && x.date === editDate);
-    return r ? r.steps : null;
-  }, [rows, user, editDate]);
+  const myRowForEditDate = useMemo(
+    () => rows.find((x) => x.userId === user?.id && x.date === editDate) || null,
+    [rows, user, editDate]
+  );
+  const myEntryForEditDate = myRowForEditDate ? myRowForEditDate.steps : null;
+  const isDeviceSynced = !inputDirty && myRowForEditDate?.source === 'device';
 
   // Keep the input in sync with the saved value unless the user is mid-edit.
   const displayInput = inputDirty
@@ -128,7 +130,7 @@ export default function StepsScreen() {
       // Optimistic local update so the leaderboard refreshes instantly.
       setRows((prev) => {
         const rest = prev.filter((r) => !(r.userId === user.id && r.date === editDate));
-        return [{ date: editDate, steps: n, userId: user.id, userName: user.name }, ...rest];
+        return [{ date: editDate, steps: n, source: 'manual', userId: user.id, userName: user.name }, ...rest];
       });
       load();
     } catch (e) {
@@ -355,6 +357,9 @@ export default function StepsScreen() {
                   keyboardType="number-pad"
                   style={styles.input}
                 />
+                {isDeviceSynced && (
+                  <Text style={styles.syncHint}>📱 Синхронизирано от телефона</Text>
+                )}
 
                 <View style={styles.quickRow}>
                   {QUICK_ADD.map((q) => (
@@ -634,6 +639,7 @@ const makeStyles = (colors) =>
       fontWeight: font.bold,
       color: colors.text,
     },
+    syncHint: { fontSize: font.xs, color: colors.textMuted, marginTop: spacing.xs },
     quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
     quickBtn: {
       paddingHorizontal: spacing.md,

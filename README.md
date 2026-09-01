@@ -20,6 +20,7 @@ This is a redesigned successor to the original Google-Sheets lunch app. It keeps
 | ⭐ **Food ratings** | Rate dishes you've ordered 1–5 stars. Averages show next to menu items, plus a team "Top dishes" leaderboard. |
 | 📝 **Manage tab (dishes & restaurants)** | The "Ястия" tab is the dish catalog (the old *Mandji* sheet). Add, edit and delete dishes, and add new restaurants — all from inside the app, no SQL needed. New restaurants appear as ordering buttons automatically. |
 | 🔄 **Pull to refresh** | Live data everywhere, backed by Supabase realtime. |
+| 👟 **Step tracking** | Yesterday's (and today's running) step count is pulled automatically from Android Health Connect every time the app opens — no typing required. A day can still be entered/corrected by hand, which then takes precedence over the automatic sync for that day. Team leaderboard, head-to-head comparison, and personal trend charts in the "Стъпки" tab. |
 
 ---
 
@@ -46,6 +47,7 @@ The original app read from Google Sheets via an Apps Script — fragile, hard to
 7. **If you already ran an older `schema.sql`** (before the views were set to `security_invoker`), also run [`supabase/migration_security_invoker_views.sql`](supabase/migration_security_invoker_views.sql) once.
 8. **If you already ran an older `schema.sql`** (before push notifications), also run [`supabase/migration_push_tokens.sql`](supabase/migration_push_tokens.sql) once.
 9. **If you already ran an older `schema.sql`** (before the stray `rls_auto_enable()` function was locked down), also run [`supabase/migration_revoke_rls_auto_enable.sql`](supabase/migration_revoke_rls_auto_enable.sql) once.
+10. **If you already ran an older `schema.sql`** (before automatic step sync from Health Connect), also run [`supabase/migration_steps_source.sql`](supabase/migration_steps_source.sql) once.
 
 **Adding more restaurants:** copy [`supabase/add_restaurant_template.sql`](supabase/add_restaurant_template.sql), fill in the restaurant name and its dishes, and run it. The new restaurant's button appears in the app automatically (pull to refresh). No rebuild needed.
 
@@ -66,6 +68,13 @@ npm start            # opens Expo — scan the QR with Expo Go on your phone
 ```
 
 > Without step 1–2 the app still boots in **demo mode**: you can browse the menu, but orders won't save.
+
+> **Health Connect note:** the app links a native module (`react-native-health-connect`) for
+> automatic step sync, so plain **Expo Go can no longer run it** — use a dev-client build instead:
+> `eas build --profile development --platform android` (or `npx expo run:android` if you have the
+> Android SDK installed locally), then `npm start` and open the app it installs. Step sync itself
+> needs [Health Connect](https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata)
+> on the test device — built into Android 14+, otherwise install it from the Play Store.
 
 ---
 
