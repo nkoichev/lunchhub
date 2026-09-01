@@ -22,6 +22,7 @@ import CartScreen from './src/screens/CartScreen';
 import TodayScreen from './src/screens/TodayScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import RatingsScreen from './src/screens/RatingsScreen';
+import StepsScreen from './src/screens/StepsScreen';
 import EditOrderScreen from './src/screens/EditOrderScreen';
 import ManageScreen from './src/screens/ManageScreen';
 
@@ -50,6 +51,7 @@ const TAB_ICON = {
   Today: '👥',
   History: '📜',
   Ratings: '⭐',
+  Steps: '👟',
   Manage: '📝',
 };
 
@@ -143,6 +145,7 @@ function AnimatedTabBar({ state, descriptors, navigation, colors }) {
               ) : null}
             </View>
             <Text
+              numberOfLines={1}
               style={{
                 fontSize: 11,
                 fontWeight: font.semibold,
@@ -200,6 +203,7 @@ function MainTabs() {
         <Tab.Screen name="Today" component={TodayScreen} options={{ title: 'Днес' }} />
         <Tab.Screen name="History" component={HistoryScreen} options={{ title: 'История' }} />
         <Tab.Screen name="Ratings" component={RatingsScreen} options={{ title: 'Оценки' }} />
+        <Tab.Screen name="Steps" component={StepsScreen} options={{ title: 'Стъпки' }} />
         <Tab.Screen name="Manage" component={ManageScreen} options={{ title: 'Ястия' }} />
       </Tab.Navigator>
     </View>

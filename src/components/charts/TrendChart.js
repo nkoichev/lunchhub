@@ -11,7 +11,12 @@ function shortDate(dateStr) {
 
 // Daily-totals column chart with a tap-for-tooltip readout below the bars
 // (a persistent axis label per bar would be too dense at this width).
-export default function TrendChart({ days, colors }) {
+// `formatValue` lets callers show something other than money (e.g. steps).
+export default function TrendChart({
+  days,
+  colors,
+  formatValue = (v) => `${v.toFixed(2)} ${CURRENCY}`,
+}) {
   const styles = makeStyles(colors);
   const [selected, setSelected] = useState(null);
   const max = Math.max(1, ...days.map((d) => d.total));
@@ -39,9 +44,7 @@ export default function TrendChart({ days, colors }) {
       </View>
       <View style={styles.readout}>
         <Text style={styles.readoutDate}>{shortDate(active.date)}</Text>
-        <Text style={styles.readoutValue}>
-          {active.total.toFixed(2)} {CURRENCY}
-        </Text>
+        <Text style={styles.readoutValue}>{formatValue(active.total)}</Text>
       </View>
     </View>
   );

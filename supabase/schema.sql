@@ -105,6 +105,22 @@ create table if not exists public.push_tokens (
 );
 create index if not exists push_tokens_user_idx on public.push_tokens(user_id);
 
+-- ---------- DAILY STEPS ----------
+-- One row per user per calendar day for the "Стъпки" tab (personal trend
+-- + team leaderboard + head-to-head comparison). Re-logging a day upserts
+-- on the unique pair instead of stacking rows.
+create table if not exists public.daily_steps (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references public.users(id) on delete cascade,
+  step_date  date not null default current_date,
+  steps      int  not null default 0 check (steps >= 0 and steps <= 300000),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, step_date)
+);
+create index if not exists daily_steps_date_idx on public.daily_steps(step_date);
+create index if not exists daily_steps_user_idx on public.daily_steps(user_id);
+
 -- ---------- AGGREGATE VIEW: average rating per dish, per restaurant ----------
 -- security_invoker: the view runs with the QUERYING role's privileges (and
 -- RLS) instead of the view owner's — otherwise a view silently bypasses any
@@ -153,11 +169,12 @@ alter table public.order_items enable row level security;
 alter table public.ratings     enable row level security;
 alter table public.push_tokens enable row level security;
 alter table public.day_payers  enable row level security;
+alter table public.daily_steps enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['users','restaurants','menu_items','orders','order_items','ratings','push_tokens','day_payers']
+  foreach t in array array['users','restaurants','menu_items','orders','order_items','ratings','push_tokens','day_payers','daily_steps']
   loop
     execute format(
       'drop policy if exists "anon_all_%1$s" on public.%1$s;', t);
@@ -170,3 +187,4 @@ end $$;
 alter publication supabase_realtime add table public.orders;
 alter publication supabase_realtime add table public.order_items;
 alter publication supabase_realtime add table public.ratings;
+alter publication supabase_realtime add table public.daily_steps;
