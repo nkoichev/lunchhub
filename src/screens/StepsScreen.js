@@ -7,7 +7,6 @@ import {
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
-  TextInput,
   Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -20,13 +19,8 @@ import TrendChart from '../components/charts/TrendChart';
 import StepsCompareChart, { PERSON_COLORS } from '../components/charts/StepsCompareChart';
 import { alertMessage } from '../utils/confirm';
 import { spacing, radius, font } from '../theme/theme';
-import {
-  fetchAllSteps,
-  saveSteps,
-  todayDateString,
-  dateStringDaysAgo,
-} from '../services/stepService';
-import { syncDeviceStepsNow } from '../services/stepSyncService';
+import { fetchAllSteps, todayDateString, dateStringDaysAgo } from '../services/stepService';
+import { syncDeviceSteps, syncDeviceStepsNow } from '../services/stepSyncService';
 
 const RANGE_OPTIONS = [
   { id: '7', label: '7 дни', days: 7 },
@@ -37,16 +31,8 @@ const RANGE_OPTIONS = [
 const COMPARE_DAYS = 14;   // fixed head-to-head window
 const TREND_DAYS = 14;     // fixed personal-trend window
 const MAX_COMPARE_PEOPLE = 6;
-const QUICK_ADD = [100, 500, 1000, 2500];
 
 const fmt = (n) => Math.round(n || 0).toLocaleString('bg-BG');
-
-function dayChipLabel(dateStr) {
-  if (dateStr === todayDateString()) return 'Днес';
-  if (dateStr === dateStringDaysAgo(1)) return 'Вчера';
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('bg-BG', { day: '2-digit', month: '2-digit' });
-}
 
 function longDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -62,15 +48,9 @@ export default function StepsScreen() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [mode, setMode] = useState('today'); // 'today' | 'leaderboard' | 'compare' | 'me'
   const [rangeId, setRangeId] = useState('7');
-
-  const [editDate, setEditDate] = useState(() => todayDateString());
-  const [input, setInput] = useState('');
-  const [inputDirty, setInputDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-
   const [picked, setPicked] = useState(null); // Set<userId> | null (=auto top N)
 
   const load = useCallback(async () => {
@@ -84,73 +64,32 @@ export default function StepsScreen() {
     }
   }, []);
 
+  // On every focus: pull fresh data from Health Connect (silent), then reload.
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      load();
-    }, [load])
+      let alive = true;
+      (async () => {
+        await syncDeviceSteps(user);
+        if (alive) await load();
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [load, user])
   );
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    load();
+    await syncDeviceSteps(user);
+    await load();
   };
 
-  // The current user's saved entry for the day being edited.
-  const myRowForEditDate = useMemo(
-    () => rows.find((x) => x.userId === user?.id && x.date === editDate) || null,
-    [rows, user, editDate]
-  );
-  const myEntryForEditDate = myRowForEditDate ? myRowForEditDate.steps : null;
-  const isDeviceSynced = !inputDirty && myRowForEditDate?.source === 'device';
-
-  // Keep the input in sync with the saved value unless the user is mid-edit.
-  const displayInput = inputDirty
-    ? input
-    : myEntryForEditDate != null
-    ? String(myEntryForEditDate)
-    : '';
-
-  const pickDay = (dateStr) => {
-    setEditDate(dateStr);
-    setInputDirty(false);
-    setInput('');
-  };
-
-  const bumpInput = (delta) => {
-    const base = Number(displayInput) || 0;
-    setInput(String(Math.max(0, base + delta)));
-    setInputDirty(true);
-  };
-
-  const onSave = async () => {
-    setSaving(true);
-    try {
-      const n = await saveSteps(user, displayInput || 0, editDate);
-      setInput('');
-      setInputDirty(false);
-      // Optimistic local update so the leaderboard refreshes instantly.
-      setRows((prev) => {
-        const rest = prev.filter((r) => !(r.userId === user.id && r.date === editDate));
-        return [{ date: editDate, steps: n, source: 'manual', userId: user.id, userName: user.name }, ...rest];
-      });
-      load();
-    } catch (e) {
-      alertMessage('Грешка', e.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const onSyncFromPhone = async () => {
+  const onSyncNow = async () => {
     setSyncing(true);
     try {
       const { today, yesterday } = await syncDeviceStepsNow(user);
       await load();
-      alertMessage(
-        'Готово',
-        `Днес: ${fmt(today)} стъпки\nВчера: ${fmt(yesterday)} стъпки`
-      );
+      alertMessage('Готово', `Днес: ${fmt(today)} стъпки\nВчера: ${fmt(yesterday)} стъпки`);
     } catch (e) {
       alertMessage('Health Connect', e.message);
     } finally {
@@ -204,7 +143,13 @@ export default function StepsScreen() {
     };
   }, [rangedRows, user]);
 
-  // ---- Today's ranked entries ----
+  // ---- Today ----
+  const myTodaySteps = useMemo(() => {
+    const today = todayDateString();
+    const r = rows.find((x) => x.userId === user?.id && x.date === today);
+    return r ? r.steps : null;
+  }, [rows, user]);
+
   const todayRows = useMemo(() => {
     const today = todayDateString();
     return rows
@@ -272,7 +217,7 @@ export default function StepsScreen() {
     for (let i = 0; ; i++) {
       const key = dateStringDaysAgo(i);
       if (logged.has(key)) streak += 1;
-      else if (i === 0) continue; // today not logged yet — streak still alive
+      else if (i === 0) continue; // today may not be counted yet
       else break;
     }
 
@@ -283,7 +228,7 @@ export default function StepsScreen() {
       avg: activeDays ? Math.round(total / activeDays) : 0,
       best,
       streak,
-      hasAny: myAll.length > 0,
+      hasAny: myAll.some((r) => r.steps > 0),
     };
   }, [rows, user, rangedRows]);
 
@@ -295,7 +240,6 @@ export default function StepsScreen() {
     );
   }
 
-  const dayChips = [0, 1, 2, 3, 4].map((n) => dateStringDaysAgo(n));
   const showRange = mode === 'leaderboard' || mode === 'me';
 
   return (
@@ -321,7 +265,6 @@ export default function StepsScreen() {
 
       <ScrollView
         contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
@@ -343,86 +286,35 @@ export default function StepsScreen() {
             </View>
           )}
 
-          {/* ---------- TODAY: entry + today's leaderboard ---------- */}
+          {/* ---------- TODAY ---------- */}
           {mode === 'today' && (
             <>
               <View style={[styles.card, shadow.card]}>
-                <Text style={styles.cardTitle}>Въведи стъпки</Text>
+                <Text style={styles.cardTitle}>Моите стъпки днес</Text>
+                <Text style={styles.bigValue}>{myTodaySteps != null ? fmt(myTodaySteps) : '—'}</Text>
+                <Text style={styles.cardSub}>{longDate(todayDateString())}</Text>
 
-                <View style={styles.dayChips}>
-                  {dayChips.map((d) => (
-                    <TouchableOpacity
-                      key={d}
-                      onPress={() => pickDay(d)}
-                      style={[styles.dayChip, editDate === d && styles.dayChipActive]}
-                    >
-                      <Text style={[styles.dayChipText, editDate === d && styles.dayChipTextActive]}>
-                        {dayChipLabel(d)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <Text style={styles.inputLabel}>{longDate(editDate)}</Text>
-                <TextInput
-                  value={displayInput}
-                  onChangeText={(t) => {
-                    setInput(t.replace(/[^0-9]/g, ''));
-                    setInputDirty(true);
-                  }}
-                  placeholder="напр. 8500"
-                  placeholderTextColor={colors.textFaint}
-                  keyboardType="number-pad"
-                  style={styles.input}
-                />
-                {isDeviceSynced && (
-                  <Text style={styles.syncHint}>📱 Синхронизирано от телефона</Text>
-                )}
-
-                <View style={styles.quickRow}>
-                  {QUICK_ADD.map((q) => (
-                    <TouchableOpacity key={q} style={styles.quickBtn} onPress={() => bumpInput(q)}>
-                      <Text style={styles.quickText}>+{q >= 1000 ? `${q / 1000}k` : q}</Text>
-                    </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity
-                    style={styles.quickBtn}
-                    onPress={() => {
-                      setInput('0');
-                      setInputDirty(true);
-                    }}
-                  >
-                    <Text style={styles.quickText}>0</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.saveBtn, saving && { opacity: 0.6 }]}
-                  onPress={onSave}
-                  disabled={saving}
-                >
-                  <Text style={styles.saveText}>
-                    {saving ? 'Запазване…' : myEntryForEditDate != null ? 'Обнови' : 'Запази'}
-                  </Text>
-                </TouchableOpacity>
-
-                {Platform.OS === 'android' && (
+                {Platform.OS === 'android' ? (
                   <TouchableOpacity
                     style={[styles.syncBtn, syncing && { opacity: 0.6 }]}
-                    onPress={onSyncFromPhone}
+                    onPress={onSyncNow}
                     disabled={syncing}
                   >
                     <Text style={styles.syncBtnText}>
-                      {syncing ? 'Синхронизиране…' : '📲 Вземи от Health Connect'}
+                      {syncing ? 'Синхронизиране…' : '🔄 Обнови от Health Connect'}
                     </Text>
                   </TouchableOpacity>
+                ) : (
+                  <Text style={styles.muted}>
+                    Стъпките се четат автоматично от Health Connect на Android устройство.
+                  </Text>
                 )}
               </View>
 
               <View style={[styles.chartCard, shadow.card]}>
                 <Text style={styles.chartTitle}>🏆 Класация за днес</Text>
                 {todayRows.length === 0 ? (
-                  <Text style={styles.muted}>Още никой не е въвел стъпки днес.</Text>
+                  <Text style={styles.muted}>Още няма стъпки за днес.</Text>
                 ) : (
                   <RankBarChart
                     data={todayRows.map((r) => ({ label: r.userName, value: r.steps }))}
@@ -441,7 +333,7 @@ export default function StepsScreen() {
               <EmptyState
                 emoji="🏆"
                 title="Няма данни"
-                subtitle="Класацията ще се появи, щом някой въведе стъпки за този период."
+                subtitle="Класацията ще се появи, щом има синхронизирани стъпки за този период."
               />
             ) : (
               <>
@@ -490,7 +382,7 @@ export default function StepsScreen() {
               <EmptyState
                 emoji="📊"
                 title="Няма данни"
-                subtitle="Нужни са поне няколко въведени дни, за да се сравняват колеги."
+                subtitle="Нужни са поне няколко дни с данни, за да се сравняват колеги."
               />
             ) : (
               <>
@@ -546,7 +438,7 @@ export default function StepsScreen() {
               <EmptyState
                 emoji="📈"
                 title="Все още няма стъпки"
-                subtitle="Въведи стъпките си от таб „Днес“, за да видиш личния си напредък."
+                subtitle="Личният ти напредък ще се появи, щом стъпките се синхронизират от Health Connect."
               />
             ) : (
               <>
@@ -635,63 +527,15 @@ const makeStyles = (colors) =>
       marginBottom: spacing.md,
       borderWidth: 1,
       borderColor: colors.border,
-    },
-    cardTitle: { fontSize: font.md, fontWeight: font.bold, color: colors.text, marginBottom: spacing.md },
-
-    dayChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
-    dayChip: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: 7,
-      borderRadius: radius.pill,
-      backgroundColor: colors.surfaceAlt,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-    },
-    dayChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    dayChipText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.textMuted },
-    dayChipTextActive: { color: colors.onPrimary },
-
-    inputLabel: {
-      fontSize: font.xs,
-      fontWeight: font.bold,
-      color: colors.textMuted,
-      textTransform: 'capitalize',
-      marginBottom: spacing.xs,
-    },
-    input: {
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: radius.md,
-      backgroundColor: colors.surfaceAlt,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: Platform.OS === 'ios' ? 14 : 10,
-      fontSize: font.xl,
-      fontWeight: font.bold,
-      color: colors.text,
-    },
-    syncHint: { fontSize: font.xs, color: colors.textMuted, marginTop: spacing.xs },
-    quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
-    quickBtn: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: 8,
-      borderRadius: radius.sm,
-      backgroundColor: colors.primaryLight,
-      borderWidth: 1,
-      borderColor: colors.primary,
-    },
-    quickText: { fontSize: font.sm, fontWeight: font.bold, color: colors.primaryDark },
-
-    saveBtn: {
-      marginTop: spacing.lg,
-      backgroundColor: colors.primary,
-      borderRadius: radius.md,
-      paddingVertical: 14,
       alignItems: 'center',
     },
-    saveText: { fontSize: font.md, fontWeight: font.bold, color: colors.onPrimary },
+    cardTitle: { fontSize: font.sm, fontWeight: font.semibold, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+    bigValue: { fontSize: font.xxl + 8, fontWeight: font.bold, color: colors.primary, marginTop: spacing.xs },
+    cardSub: { fontSize: font.sm, color: colors.textMuted, textTransform: 'capitalize', marginTop: 2 },
 
     syncBtn: {
-      marginTop: spacing.sm,
+      alignSelf: 'stretch',
+      marginTop: spacing.lg,
       backgroundColor: colors.surfaceAlt,
       borderWidth: 1.5,
       borderColor: colors.primary,
@@ -739,5 +583,5 @@ const makeStyles = (colors) =>
     personChipTextActive: { color: colors.onPrimary },
 
     hint: { fontSize: font.sm, color: colors.textMuted, marginBottom: spacing.sm },
-    muted: { fontSize: font.base, color: colors.textFaint, paddingVertical: spacing.sm },
+    muted: { fontSize: font.base, color: colors.textFaint, paddingVertical: spacing.sm, textAlign: 'center' },
   });

@@ -20,7 +20,7 @@ This is a redesigned successor to the original Google-Sheets lunch app. It keeps
 | ⭐ **Food ratings** | Rate dishes you've ordered 1–5 stars. Averages show next to menu items, plus a team "Top dishes" leaderboard. |
 | 📝 **Manage tab (dishes & restaurants)** | The "Ястия" tab is the dish catalog (the old *Mandji* sheet). Add, edit and delete dishes, and add new restaurants — all from inside the app, no SQL needed. New restaurants appear as ordering buttons automatically. |
 | 🔄 **Pull to refresh** | Live data everywhere, backed by Supabase realtime. |
-| 👟 **Step tracking** | Yesterday's (and today's running) step count is pulled automatically from Android Health Connect every time the app opens — no typing required. A day can still be entered/corrected by hand, which then takes precedence over the automatic sync for that day. Team leaderboard, head-to-head comparison, and personal trend charts in the "Стъпки" tab. |
+| 👟 **Step tracking** | The last 7 days of step counts are pulled automatically from Android Health Connect on every app open and every time the "Стъпки" tab is focused (plus a manual "refresh" button). No manual entry — the numbers come straight from the phone. Team leaderboard, head-to-head comparison, and personal trend charts. |
 
 ---
 
