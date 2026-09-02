@@ -203,8 +203,8 @@ function MainTabs() {
         <Tab.Screen name="Today" component={TodayScreen} options={{ title: 'Днес' }} />
         <Tab.Screen name="History" component={HistoryScreen} options={{ title: 'История' }} />
         <Tab.Screen name="Ratings" component={RatingsScreen} options={{ title: 'Оценки' }} />
-        <Tab.Screen name="Steps" component={StepsScreen} options={{ title: 'Стъпки' }} />
         <Tab.Screen name="Manage" component={ManageScreen} options={{ title: 'Ястия' }} />
+        <Tab.Screen name="Steps" component={StepsScreen} options={{ title: 'Стъпки' }} />
       </Tab.Navigator>
     </View>
   );
