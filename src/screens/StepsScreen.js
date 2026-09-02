@@ -26,6 +26,7 @@ import {
   todayDateString,
   dateStringDaysAgo,
 } from '../services/stepService';
+import { syncDeviceStepsNow } from '../services/stepSyncService';
 
 const RANGE_OPTIONS = [
   { id: '7', label: '7 дни', days: 7 },
@@ -68,6 +69,7 @@ export default function StepsScreen() {
   const [input, setInput] = useState('');
   const [inputDirty, setInputDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const [picked, setPicked] = useState(null); // Set<userId> | null (=auto top N)
 
@@ -137,6 +139,22 @@ export default function StepsScreen() {
       alertMessage('Грешка', e.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onSyncFromPhone = async () => {
+    setSyncing(true);
+    try {
+      const { today, yesterday } = await syncDeviceStepsNow(user);
+      await load();
+      alertMessage(
+        'Готово',
+        `Днес: ${fmt(today)} стъпки\nВчера: ${fmt(yesterday)} стъпки`
+      );
+    } catch (e) {
+      alertMessage('Health Connect', e.message);
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -387,6 +405,18 @@ export default function StepsScreen() {
                     {saving ? 'Запазване…' : myEntryForEditDate != null ? 'Обнови' : 'Запази'}
                   </Text>
                 </TouchableOpacity>
+
+                {Platform.OS === 'android' && (
+                  <TouchableOpacity
+                    style={[styles.syncBtn, syncing && { opacity: 0.6 }]}
+                    onPress={onSyncFromPhone}
+                    disabled={syncing}
+                  >
+                    <Text style={styles.syncBtnText}>
+                      {syncing ? 'Синхронизиране…' : '📲 Вземи от Health Connect'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={[styles.chartCard, shadow.card]}>
@@ -659,6 +689,17 @@ const makeStyles = (colors) =>
       alignItems: 'center',
     },
     saveText: { fontSize: font.md, fontWeight: font.bold, color: colors.onPrimary },
+
+    syncBtn: {
+      marginTop: spacing.sm,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      borderRadius: radius.md,
+      paddingVertical: 12,
+      alignItems: 'center',
+    },
+    syncBtnText: { fontSize: font.base, fontWeight: font.bold, color: colors.primary },
 
     statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
     statTile: {
