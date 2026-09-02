@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
@@ -61,6 +61,7 @@ const TAB_ICON = {
 // border — wrapping the default per-item content in a border made icon and
 // label overlap because it fought the default renderer's own layout.
 function AnimatedTabBar({ state, descriptors, navigation, colors }) {
+  const insets = useSafeAreaInsets();
   const [layouts, setLayouts] = useState({});
   const indicatorX = useRef(new Animated.Value(0)).current;
   const indicatorW = useRef(new Animated.Value(0)).current;
@@ -84,9 +85,9 @@ function AnimatedTabBar({ state, descriptors, navigation, colors }) {
         backgroundColor: colors.surface,
         borderTopWidth: 1,
         borderTopColor: colors.border,
-        height: 62,
+        height: 62 + insets.bottom,
         paddingTop: 6,
-        paddingBottom: 8,
+        paddingBottom: 8 + insets.bottom,
       }}
     >
       <Animated.View
@@ -94,7 +95,7 @@ function AnimatedTabBar({ state, descriptors, navigation, colors }) {
         style={{
           position: 'absolute',
           top: 2,
-          bottom: 2,
+          bottom: 2 + insets.bottom,
           borderRadius: 14,
           borderWidth: 1.5,
           borderColor: colors.primary,
