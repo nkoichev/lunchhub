@@ -5,12 +5,15 @@ import { fetchAllHistory, deleteOrder } from '../services/orderService';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { EmptyState } from '../components/ui';
+import Avatar from '../components/Avatar';
 import RankBarChart from '../components/charts/RankBarChart';
 import TrendChart from '../components/charts/TrendChart';
 import PersonDishChart from '../components/charts/PersonDishChart';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
+
+const ALL_PEOPLE_ID = '__all__';
 
 const RANGE_OPTIONS = [
   { id: '7', label: '7 дни', days: 7 },
@@ -31,9 +34,19 @@ export default function HistoryScreen({ navigation }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [mode, setMode] = useState('charts'); // 'charts' | 'orders' | 'summary' | 'person'
+  const [mode, setMode] = useState('person'); // 'person' | 'summary' | 'charts'
   const [rangeId, setRangeId] = useState('30');
-  const [personId, setPersonId] = useState(() => user?.id ?? null);
+  const [personId, setPersonId] = useState(() => user?.id ?? ALL_PEOPLE_ID);
+  const [expandedRows, setExpandedRows] = useState(() => new Set());
+
+  const toggleExpanded = (key) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const load = useCallback(async () => {
     try {
@@ -112,6 +125,15 @@ export default function HistoryScreen({ navigation }) {
     return orders.filter((o) => o.date >= cutoffStr);
   }, [orders, rangeId]);
 
+  // Google-linked users' avatars, for the "По хора" ranking bars.
+  const avatarByName = useMemo(() => {
+    const map = new Map();
+    orders.forEach((o) => {
+      if (o.userAvatar && !map.has(o.userName)) map.set(o.userName, o.userAvatar);
+    });
+    return map;
+  }, [orders]);
+
   // Rankings + trend for the "Графики" tab, built from the ranged/full history.
   const charts = useMemo(() => {
     const restaurantTotals = {};
@@ -159,31 +181,34 @@ export default function HistoryScreen({ navigation }) {
 
     return {
       byRestaurant: toRanked(restaurantTotals),
-      byPerson: toRanked(personTotals),
+      byPerson: toRanked(personTotals).map((d) => ({ ...d, avatarUrl: avatarByName.get(d.label) ?? null })),
       byDish: rankedDishes,
       dailyTotals,
       totalSpend: rangedOrders.reduce((s, o) => s + o.total, 0),
       orderCount: rangedOrders.length,
       topDish,
     };
-  }, [rangedOrders, orders]);
+  }, [rangedOrders, orders, avatarByName]);
 
   // Everyone who has ordered at least once, for the "По човек" picker.
+  // "Всички" is pinned first so the group's overall top dishes are one tap away.
   const people = useMemo(() => {
     const map = new Map();
     orders.forEach((o) => {
       if (!map.has(o.userId)) map.set(o.userId, o.userName);
     });
-    return Array.from(map.entries())
+    const list = Array.from(map.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
+    return [{ id: ALL_PEOPLE_ID, name: 'Всички' }, ...list];
   }, [orders]);
 
   // Selected person's orders within the chosen range, oldest first (for the day chart).
+  // When "Всички" is selected, this is everyone's orders in range instead of one person's.
   const personRangedOrders = useMemo(() => {
     if (!personId) return [];
     const range = RANGE_OPTIONS.find((r) => r.id === rangeId);
-    let list = orders.filter((o) => o.userId === personId);
+    let list = personId === ALL_PEOPLE_ID ? orders : orders.filter((o) => o.userId === personId);
     if (range?.days) {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - range.days);
@@ -258,19 +283,11 @@ export default function HistoryScreen({ navigation }) {
       <View style={styles.toggleWrap}>
         <View style={[styles.toggle, { maxWidth: readWidth, alignSelf: 'center', width: '100%' }]}>
           <TouchableOpacity
-            style={[styles.toggleBtn, mode === 'charts' && styles.toggleBtnActive]}
-            onPress={() => setMode('charts')}
+            style={[styles.toggleBtn, mode === 'person' && styles.toggleBtnActive]}
+            onPress={() => setMode('person')}
           >
-            <Text style={[styles.toggleText, mode === 'charts' && styles.toggleTextActive]}>
-              📊 Графики
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, mode === 'orders' && styles.toggleBtnActive]}
-            onPress={() => setMode('orders')}
-          >
-            <Text style={[styles.toggleText, mode === 'orders' && styles.toggleTextActive]}>
-              Всички поръчки
+            <Text style={[styles.toggleText, mode === 'person' && styles.toggleTextActive]}>
+              👤 По човек
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -282,11 +299,11 @@ export default function HistoryScreen({ navigation }) {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.toggleBtn, mode === 'person' && styles.toggleBtnActive]}
-            onPress={() => setMode('person')}
+            style={[styles.toggleBtn, mode === 'charts' && styles.toggleBtnActive]}
+            onPress={() => setMode('charts')}
           >
-            <Text style={[styles.toggleText, mode === 'person' && styles.toggleTextActive]}>
-              👤 По човек
+            <Text style={[styles.toggleText, mode === 'charts' && styles.toggleTextActive]}>
+              📊 Графики
             </Text>
           </TouchableOpacity>
         </View>
@@ -303,61 +320,6 @@ export default function HistoryScreen({ navigation }) {
             title="Няма поръчки"
             subtitle="Поръчките ще се появят тук след първата поръчка на екипа."
           />
-        ) : mode === 'orders' ? (
-          // ---------- ALL ORDERS ----------
-          days.map((day) => (
-            <View key={day.date} style={styles.daySection}>
-              <View style={styles.dayHeaderRow}>
-                <Text style={styles.dayHeader}>{formatDate(day.date)}</Text>
-                <Text style={styles.dayHeaderTotal}>
-                  {day.total.toFixed(2)} {CURRENCY}
-                </Text>
-              </View>
-              {day.list.map((o) => {
-                const isMe = user && o.userId === user.id;
-                return (
-                  <View key={o.id} style={[styles.orderCard, shadow.card, isMe && styles.myCard]}>
-                    <View style={styles.orderHeader}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.person}>
-                          {o.userName}
-                          {isMe ? '  (аз)' : ''}
-                        </Text>
-                        <Text style={styles.orderRest}>{o.restaurantName}</Text>
-                      </View>
-                      <Text style={styles.orderTotal}>
-                        {o.total.toFixed(2)} {CURRENCY}
-                      </Text>
-                    </View>
-                    {o.items.map((it, idx) => (
-                      <View key={idx} style={styles.itemRow}>
-                        <Text style={styles.itemName}>
-                          {it.item_name}
-                          {it.quantity > 1 ? ` ×${it.quantity}` : ''}
-                        </Text>
-                        <Text style={styles.itemPrice}>
-                          {Number(it.line_total).toFixed(2)} {CURRENCY}
-                        </Text>
-                      </View>
-                    ))}
-                    {isMe ? (
-                      <View style={styles.actions}>
-                        <TouchableOpacity
-                          style={styles.actionBtn}
-                          onPress={() => navigation.navigate('EditOrder', { orderId: o.id })}
-                        >
-                          <Text style={styles.actionText}>✏️ Редактирай</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => confirmDelete(o.id)}>
-                          <Text style={[styles.actionText, { color: colors.danger }]}>🗑️ Изтрий</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : null}
-                  </View>
-                );
-              })}
-            </View>
-          ))
         ) : mode === 'summary' ? (
           // ---------- SUMMARY ----------
           days.map((day) => (
@@ -382,15 +344,55 @@ export default function HistoryScreen({ navigation }) {
               <Text style={styles.subHead}>По хора</Text>
               {day.byPerson.map(([name, sum]) => {
                 const isMe = user && name.toLowerCase() === user.name.toLowerCase();
+                const rowKey = `${day.date}::${name}`;
+                const isOpen = expandedRows.has(rowKey);
+                const personOrders = day.list.filter((o) => o.userName === name);
                 return (
-                  <View key={name} style={styles.sumRow}>
-                    <Text style={[styles.sumName, isMe && { fontWeight: font.bold, color: colors.text }]}>
-                      {name}
-                      {isMe ? '  (аз)' : ''}
-                    </Text>
-                    <Text style={styles.sumValue}>
-                      {sum.toFixed(2)} {CURRENCY}
-                    </Text>
+                  <View key={name}>
+                    <TouchableOpacity
+                      style={styles.sumRow}
+                      activeOpacity={0.6}
+                      onPress={() => toggleExpanded(rowKey)}
+                    >
+                      <Text style={[styles.sumName, isMe && { fontWeight: font.bold, color: colors.text }]}>
+                        {isOpen ? '▾' : '▸'}{'  '}
+                        {name}
+                        {isMe ? '  (аз)' : ''}
+                      </Text>
+                      <Text style={styles.sumValue}>
+                        {sum.toFixed(2)} {CURRENCY}
+                      </Text>
+                    </TouchableOpacity>
+                    {isOpen &&
+                      personOrders.map((o) => (
+                        <View key={o.id} style={styles.personOrderBlock}>
+                          <Text style={styles.orderRest}>{o.restaurantName}</Text>
+                          {o.items.map((it, idx) => (
+                            <View key={idx} style={styles.itemRow}>
+                              <Text style={styles.itemName}>
+                                {it.item_name}
+                                {it.quantity > 1 ? ` ×${it.quantity}` : ''}
+                              </Text>
+                              <Text style={styles.itemPrice}>
+                                {Number(it.line_total).toFixed(2)} {CURRENCY}
+                              </Text>
+                            </View>
+                          ))}
+                          {isMe ? (
+                            <View style={styles.actions}>
+                              <TouchableOpacity
+                                style={styles.actionBtn}
+                                onPress={() => navigation.navigate('EditOrder', { orderId: o.id })}
+                              >
+                                <Text style={styles.actionText}>✏️ Редактирай</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity style={styles.actionBtn} onPress={() => confirmDelete(o.id)}>
+                                <Text style={[styles.actionText, { color: colors.danger }]}>🗑️ Изтрий</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : null}
+                        </View>
+                      ))}
                   </View>
                 );
               })}
@@ -409,6 +411,9 @@ export default function HistoryScreen({ navigation }) {
                     onPress={() => setPersonId(p.id)}
                     style={[styles.personChip, active && styles.personChipActive]}
                   >
+                    {p.id !== ALL_PEOPLE_ID && (
+                      <Avatar uri={avatarByName.get(p.name)} name={p.name} size={18} />
+                    )}
                     <Text
                       numberOfLines={1}
                       style={[styles.personChipText, active && styles.personChipTextActive]}
@@ -584,27 +589,7 @@ const makeStyles = (colors) => StyleSheet.create({
   dayHeader: { fontSize: font.md, fontWeight: font.bold, color: colors.text, textTransform: 'capitalize' },
   dayHeaderTotal: { fontSize: font.md, fontWeight: font.bold, color: colors.primary },
 
-  orderCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  myCard: { borderColor: colors.primary, borderWidth: 1.5 },
-  orderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  person: { fontSize: font.md, fontWeight: font.bold, color: colors.text },
   orderRest: { fontSize: font.sm, color: colors.primary, fontWeight: font.semibold, marginTop: 1 },
-  orderTotal: { fontSize: font.md, fontWeight: font.bold, color: colors.accent },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   itemName: { fontSize: font.base, color: colors.textMuted, flex: 1 },
   itemPrice: { fontSize: font.base, color: colors.textMuted },
@@ -651,9 +636,18 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   sumName: { fontSize: font.base, color: colors.textMuted, flex: 1 },
   sumValue: { fontSize: font.base, fontWeight: font.semibold, color: colors.accent },
+  personOrderBlock: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
 
   peopleWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
   personChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: spacing.lg,
     paddingVertical: 9,
     borderRadius: radius.pill,
