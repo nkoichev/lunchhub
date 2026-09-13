@@ -140,6 +140,56 @@ const PALETTES = {
       statusBar: 'dark',
     },
   },
+  icon: {
+    name: 'Икона',
+    colors: {
+      primary: '#16B7A4',
+      primaryDark: '#0E8F80',
+      primaryLight: '#DFF7F3',
+      accent: '#FFCE07',
+      bg: '#F2FBFA',
+      surface: '#FFFFFF',
+      surfaceAlt: '#EAF9F6',
+      border: '#D7EEEA',
+      text: '#12312C',
+      textMuted: '#5B7873',
+      textFaint: '#93ABA6',
+      onPrimary: '#FFFFFF',
+      success: '#16B7A4',
+      danger: '#D64545',
+      warning: '#E0A100',
+      star: '#F5A623',
+      starEmpty: '#D9EDE9',
+      overlay: 'rgba(10,35,30,0.45)',
+      shadowColor: '#12312C',
+      statusBar: 'dark',
+    },
+  },
+  iconDark: {
+    name: 'Икона (тъмна)',
+    colors: {
+      primary: '#2FDDD0',
+      primaryDark: '#16B7A4',
+      primaryLight: '#123832',
+      accent: '#FFCE07',
+      bg: '#0F1716',
+      surface: '#16211F',
+      surfaceAlt: '#1B2825',
+      border: '#243532',
+      text: '#EAF6F4',
+      textMuted: '#9FB6B2',
+      textFaint: '#6C807C',
+      onPrimary: '#08312B',
+      success: '#2FDDD0',
+      danger: '#FF6B6B',
+      warning: '#F0B429',
+      star: '#FFC24B',
+      starEmpty: '#2A3F3B',
+      overlay: 'rgba(0,0,0,0.6)',
+      shadowColor: '#000000',
+      statusBar: 'light',
+    },
+  },
   berry: {
     name: 'Боровинка',
     colors: {
@@ -173,7 +223,7 @@ export const THEMES = Object.entries(PALETTES).map(([id, t]) => ({
   colors: t.colors,
 }));
 
-export const DEFAULT_THEME_ID = 'ocean';
+export const DEFAULT_THEME_ID = 'icon';
 
 export function getTheme(id) {
   return THEMES.find((t) => t.id === id) ?? THEMES[0];
