@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import { RESTAURANT } from '../data/menu';
 import { confirmDialog } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
+import Avatar from './Avatar';
 import ThemeModal from './ThemeModal';
 import ProfileModal from './ProfileModal';
 import DensityModal from './DensityModal';
@@ -34,7 +35,8 @@ export default function AppHeader() {
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
       <View style={[styles.inner, { maxWidth, alignSelf: 'center', width: '100%' }]}>
-        <View style={{ flex: 1 }}>
+        <Avatar uri={user?.avatarUrl} name={user?.name} size={36} />
+        <View style={{ flex: 1, marginLeft: spacing.sm }}>
           <Text style={styles.greeting}>Здравей, {user?.name} 👋</Text>
           <Text style={styles.subtitle}>{RESTAURANT.name}</Text>
         </View>

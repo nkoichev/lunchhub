@@ -291,7 +291,7 @@ export async function fetchAllHistory(limit = 200) {
       .from('order_items')
       .select('order_id, item_name, quantity, line_total')
       .in('order_id', orderIds),
-    supabase.from('users').select('id, name').in('id', userIds),
+    supabase.from('users').select('id, name, avatar_url').in('id', userIds),
   ]);
 
   const byOrder = {};
@@ -299,8 +299,10 @@ export async function fetchAllHistory(limit = 200) {
     (byOrder[it.order_id] ??= []).push(it);
   });
   const nameById = {};
+  const avatarById = {};
   (users || []).forEach((u) => {
     nameById[u.id] = u.name;
+    avatarById[u.id] = u.avatar_url ?? null;
   });
 
   return orders.map((o) => ({
@@ -310,6 +312,7 @@ export async function fetchAllHistory(limit = 200) {
     restaurantName: o.restaurant_name ?? '—',
     userId: o.user_id,
     userName: nameById[o.user_id] ?? '—',
+    userAvatar: avatarById[o.user_id] ?? null,
     items: byOrder[o.id] ?? [],
   }));
 }

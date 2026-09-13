@@ -18,7 +18,10 @@ create table if not exists public.users (
   id          uuid primary key default gen_random_uuid(),
   name        text not null unique,
   created_at  timestamptz not null default now(),
-  revolut_tag text
+  revolut_tag text,
+  -- Set when the user signs in with Google instead of just a name;
+  -- backfilled from their Google profile photo.
+  avatar_url  text
 );
 
 -- ---------- RESTAURANTS ----------

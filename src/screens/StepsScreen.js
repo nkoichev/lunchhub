@@ -105,6 +105,15 @@ export default function StepsScreen() {
     return rows.filter((r) => r.date >= cutoff);
   }, [rows, rangeId]);
 
+  // Google-linked users' avatars, for the leaderboard bars.
+  const avatarByUserId = useMemo(() => {
+    const map = new Map();
+    rows.forEach((r) => {
+      if (r.userAvatar && !map.has(r.userId)) map.set(r.userId, r.userAvatar);
+    });
+    return map;
+  }, [rows]);
+
   // ---- Per-person aggregates for the leaderboard ----
   const leaderboard = useMemo(() => {
     const byUser = new Map();
@@ -134,14 +143,16 @@ export default function StepsScreen() {
       teamTotal,
       mine,
       myRank,
-      byTotal: people.slice(0, 8).map((p) => ({ label: p.name, value: p.total })),
+      byTotal: people
+        .slice(0, 8)
+        .map((p) => ({ label: p.name, value: p.total, avatarUrl: avatarByUserId.get(p.userId) ?? null })),
       byAvg: people
         .slice()
         .sort((a, b) => b.avg - a.avg)
         .slice(0, 8)
-        .map((p) => ({ label: p.name, value: p.avg })),
+        .map((p) => ({ label: p.name, value: p.avg, avatarUrl: avatarByUserId.get(p.userId) ?? null })),
     };
-  }, [rangedRows, user]);
+  }, [rangedRows, user, avatarByUserId]);
 
   // ---- Today ----
   const myTodaySteps = useMemo(() => {
@@ -317,7 +328,7 @@ export default function StepsScreen() {
                   <Text style={styles.muted}>Още няма стъпки за днес.</Text>
                 ) : (
                   <RankBarChart
-                    data={todayRows.map((r) => ({ label: r.userName, value: r.steps }))}
+                    data={todayRows.map((r) => ({ label: r.userName, value: r.steps, avatarUrl: r.userAvatar ?? null }))}
                     colors={colors}
                     color={colors.primary}
                     valueFormatter={fmt}

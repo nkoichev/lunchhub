@@ -45,7 +45,7 @@ export async function fetchAllSteps(limit = 3000) {
   if (!isSupabaseConfigured) return [];
   const { data, error } = await supabase
     .from('daily_steps')
-    .select('step_date, steps, user_id, users(name)')
+    .select('step_date, steps, user_id, users(name, avatar_url)')
     .order('step_date', { ascending: false })
     .limit(limit);
   if (error) throw new Error(error.message);
@@ -55,5 +55,6 @@ export async function fetchAllSteps(limit = 3000) {
     steps: Number(r.steps),
     userId: r.user_id,
     userName: r.users?.name ?? '—',
+    userAvatar: r.users?.avatar_url ?? null,
   }));
 }

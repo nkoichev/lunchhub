@@ -16,11 +16,12 @@ import { spacing, radius, font } from '../theme/theme';
 import { isSupabaseConfigured } from '../config/supabase';
 
 export default function LoginScreen() {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const { colors, shadow } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const onSubmit = async () => {
     setLoading(true);
@@ -30,6 +31,17 @@ export default function LoginScreen() {
       alertMessage('Грешка', e.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onGoogleSubmit = async () => {
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+    } catch (e) {
+      alertMessage('Грешка', e.message);
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -68,6 +80,19 @@ export default function LoginScreen() {
           <Text style={styles.hint}>
             Няма пароли — просто въведете името си, за да продължите.
           </Text>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>или</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <Button
+            title="Продължи с Google"
+            variant="ghost"
+            onPress={onGoogleSubmit}
+            loading={googleLoading}
+          />
         </View>
 
         {!isSupabaseConfigured && (
@@ -147,6 +172,18 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.textFaint,
     textAlign: 'center',
     marginTop: spacing.md,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: {
+    marginHorizontal: spacing.md,
+    fontSize: font.sm,
+    color: colors.textFaint,
   },
   warn: {
     width: '100%',

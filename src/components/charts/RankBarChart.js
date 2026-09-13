@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import Avatar from '../Avatar';
 import { spacing, radius, font } from '../../theme/theme';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -59,10 +60,15 @@ function BarRow({ item, index, max, total, color, colors, valueFormatter, medal,
   return (
     <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={styles.row}>
       <View style={styles.labelRow}>
-        <Text style={styles.label} numberOfLines={1}>
-          {medal ? `${medal} ` : ''}
-          {item.label}
-        </Text>
+        <View style={styles.labelWithAvatar}>
+          {item.avatarUrl !== undefined && (
+            <Avatar uri={item.avatarUrl} name={item.label} size={18} />
+          )}
+          <Text style={styles.label} numberOfLines={1}>
+            {medal ? `${medal} ` : ''}
+            {item.label}
+          </Text>
+        </View>
         <Text style={styles.value}>{valueFormatter(item.value)}</Text>
       </View>
       <View style={[styles.track, selected && { backgroundColor: colors.primaryLight }]}>
@@ -80,7 +86,8 @@ function BarRow({ item, index, max, total, color, colors, valueFormatter, medal,
 const makeStyles = (colors) => StyleSheet.create({
   row: { marginBottom: spacing.md },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  label: { fontSize: font.base, fontWeight: font.semibold, color: colors.text, flex: 1, marginRight: spacing.sm },
+  labelWithAvatar: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: spacing.sm, gap: 6 },
+  label: { fontSize: font.base, fontWeight: font.semibold, color: colors.text, flex: 1 },
   value: { fontSize: font.base, fontWeight: font.bold, color: colors.textMuted },
   track: { height: 10, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: radius.sm },

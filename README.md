@@ -48,6 +48,7 @@ The original app read from Google Sheets via an Apps Script — fragile, hard to
 8. **If you already ran an older `schema.sql`** (before push notifications), also run [`supabase/migration_push_tokens.sql`](supabase/migration_push_tokens.sql) once.
 9. **If you already ran an older `schema.sql`** (before the stray `rls_auto_enable()` function was locked down), also run [`supabase/migration_revoke_rls_auto_enable.sql`](supabase/migration_revoke_rls_auto_enable.sql) once.
 10. **If you already ran an older `schema.sql`** (before automatic step sync from Health Connect), also run [`supabase/migration_steps_source.sql`](supabase/migration_steps_source.sql) once.
+11. **If you already ran an older `schema.sql`** (before Google sign-in), also run [`supabase/migration_google_avatar.sql`](supabase/migration_google_avatar.sql) once.
 
 **Adding more restaurants:** copy [`supabase/add_restaurant_template.sql`](supabase/add_restaurant_template.sql), fill in the restaurant name and its dishes, and run it. The new restaurant's button appears in the app automatically (pull to refresh). No rebuild needed.
 
@@ -75,6 +76,28 @@ npm start            # opens Expo — scan the QR with Expo Go on your phone
 > Android SDK installed locally), then `npm start` and open the app it installs. Step sync itself
 > needs [Health Connect](https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata)
 > on the test device — built into Android 14+, otherwise install it from the Play Store.
+
+### 4. Google sign-in (optional)
+
+Name-only login always works. To also let people sign in with their Google
+account (shows their Google profile photo in the app), do this once:
+
+1. **Google Cloud Console** ([console.cloud.google.com](https://console.cloud.google.com)) → APIs & Services → Credentials, in the same project as `google-services.json` (or a new one):
+   - Configure the **OAuth consent screen** if you haven't already (External, add your test users while unpublished).
+   - Create an **OAuth client ID** of type **Web application** — this is the one the app actually uses. Copy its client ID.
+   - Create a second **OAuth client ID** of type **Android**, with package name `com.lunchhub.app` and the SHA-1 fingerprint of your EAS build keystore (get it with `eas credentials -p android`, or from `eas credentials` → Android → your build profile). This one has no code to configure — Google just needs it registered so the Android app is allowed to sign in.
+2. **Supabase** → Authentication → Sign In / Providers → **Google** → paste the Web client's ID and secret, enable it.
+3. Open [`app.json`](app.json) and paste the Web client ID:
+   ```json
+   "extra": {
+     "googleWebClientId": "xxxxx.apps.googleusercontent.com"
+   }
+   ```
+4. Rebuild (`eas build --profile preview --platform android`) — the native Google Sign-In module requires a new native build, it won't show up in Expo Go or an old install.
+
+Without this, the "Продължи с Google" button on the login screen shows a
+clear error instead of crashing — everything else in the app works
+unaffected.
 
 ---
 

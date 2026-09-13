@@ -223,7 +223,7 @@ export const THEMES = Object.entries(PALETTES).map(([id, t]) => ({
   colors: t.colors,
 }));
 
-export const DEFAULT_THEME_ID = 'icon';
+export const DEFAULT_THEME_ID = 'iconDark';
 
 export function getTheme(id) {
   return THEMES.find((t) => t.id === id) ?? THEMES[0];

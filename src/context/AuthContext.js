@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { loginWithName } from '../services/authService';
+import { loginWithName, upsertUserFromGoogle } from '../services/authService';
 import { registerForPushNotifications } from '../services/pushService';
+import { signInWithGoogle, signOutGoogle, extractProfileFromSession } from '../services/googleAuthService';
+import { supabase } from '../config/supabase';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'lunchhub.user';
@@ -9,6 +11,12 @@ const STORAGE_KEY = 'lunchhub.user';
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [booting, setBooting] = useState(true);
+
+  const persist = async (u) => {
+    setUser(u);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+    registerForPushNotifications(u);
+  };
 
   useEffect(() => {
     (async () => {
@@ -22,23 +30,40 @@ export function AuthProvider({ children }) {
       } catch (_) {}
       setBooting(false);
     })();
+
+    // Web-only: finishes the Google OAuth redirect flow (native resolves
+    // immediately via the idToken path in googleAuthService instead).
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== 'SIGNED_IN' || !session?.user) return;
+      const profile = extractProfileFromSession(session);
+      if (!profile) return;
+      upsertUserFromGoogle(profile).then(persist).catch(() => {});
+    });
+    return () => subscription.subscription.unsubscribe();
   }, []);
 
   const login = async (name) => {
     const u = await loginWithName(name);
-    setUser(u);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(u));
-    registerForPushNotifications(u);
+    await persist(u);
+    return u;
+  };
+
+  const loginWithGoogle = async () => {
+    const profile = await signInWithGoogle();
+    if (!profile) return null; // cancelled, or web redirect in progress
+    const u = await upsertUserFromGoogle(profile);
+    await persist(u);
     return u;
   };
 
   const logout = async () => {
     setUser(null);
     await AsyncStorage.removeItem(STORAGE_KEY);
+    await signOutGoogle().catch(() => {});
   };
 
   return (
-    <AuthContext.Provider value={{ user, booting, login, logout }}>
+    <AuthContext.Provider value={{ user, booting, login, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );
