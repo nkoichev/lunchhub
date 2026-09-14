@@ -17,6 +17,7 @@ import AppHeader from './src/components/AppHeader';
 
 import PinGateScreen from './src/screens/PinGateScreen';
 import LoginScreen from './src/screens/LoginScreen';
+import LinkAccountScreen from './src/screens/LinkAccountScreen';
 import MenuScreen from './src/screens/MenuScreen';
 import CartScreen from './src/screens/CartScreen';
 import TodayScreen from './src/screens/TodayScreen';
@@ -232,7 +233,7 @@ function RootNavigator() {
 }
 
 function Gate() {
-  const { user, booting } = useAuth();
+  const { user, booting, pendingGoogleProfile } = useAuth();
   const { colors } = useTheme();
   const [pinVerified, setPinVerified] = useState(null); // null = still checking
 
@@ -266,7 +267,13 @@ function Gate() {
 
   return (
     <NavigationContainer>
-      {user ? <RootNavigator /> : <LoginScreen />}
+      {user ? (
+        <RootNavigator />
+      ) : pendingGoogleProfile ? (
+        <LinkAccountScreen />
+      ) : (
+        <LoginScreen />
+      )}
     </NavigationContainer>
   );
 }

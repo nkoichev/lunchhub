@@ -9,13 +9,17 @@ function extractProfile(user) {
   const meta = user.user_metadata || {};
   // Prefer the first name alone: name-only login asks for just a first name
   // (see LoginScreen's "напр. Иван" placeholder), and matching against it is
-  // how a Google sign-in links back to that same users row (see
+  // one of the ways a Google sign-in links back to that same users row (see
   // upsertUserFromGoogle). Falling back to the full name here would create a
   // second, unlinked row for the same person the first time they try Google.
   const name =
     meta.given_name || meta.full_name || meta.name || user.email?.split('@')[0] || 'Потребител';
   const avatarUrl = meta.avatar_url || meta.picture || null;
-  return { name, avatarUrl };
+  // Supabase Auth's own id for this Google identity — stable forever, and
+  // the primary (script/spelling-independent) way upsertUserFromGoogle
+  // recognizes a returning Google sign-in.
+  const authUserId = user.id;
+  return { name, avatarUrl, authUserId };
 }
 
 // Native (Android/iOS): the Google Sign-In SDK gives us an idToken, which

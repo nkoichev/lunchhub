@@ -21,7 +21,11 @@ create table if not exists public.users (
   revolut_tag text,
   -- Set when the user signs in with Google instead of just a name;
   -- backfilled from their Google profile photo.
-  avatar_url  text
+  avatar_url  text,
+  -- Supabase Auth user id for a linked Google identity. Stable forever for
+  -- that Google account, so once set it's how Google sign-in re-recognizes
+  -- this person on every future login — no name matching needed.
+  auth_user_id uuid unique
 );
 
 -- ---------- RESTAURANTS ----------
