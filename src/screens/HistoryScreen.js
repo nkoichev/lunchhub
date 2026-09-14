@@ -30,7 +30,7 @@ export default function HistoryScreen({ navigation }) {
   const { user } = useAuth();
   const { colors, shadow } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { readWidth, maxWidth, isWide } = useResponsive();
+  const { readWidth, maxWidth, isWide, isDesktop, columns } = useResponsive();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -269,6 +269,9 @@ export default function HistoryScreen({ navigation }) {
     };
   }, [personRangedOrders]);
 
+  const summaryCardBasis = columns >= 3 ? '31.5%' : columns === 2 ? '48.5%' : '100%';
+  const chartCardBasis = isDesktop ? '48.5%' : '100%';
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -316,7 +319,7 @@ export default function HistoryScreen({ navigation }) {
         <View
           style={{
             width: '100%',
-            maxWidth: mode === 'person' && isWide ? maxWidth : readWidth,
+            maxWidth: isWide ? maxWidth : readWidth,
             alignSelf: 'center',
           }}
         >
@@ -328,8 +331,12 @@ export default function HistoryScreen({ navigation }) {
           />
         ) : mode === 'summary' ? (
           // ---------- SUMMARY ----------
-          days.map((day) => (
-            <View key={day.date} style={[styles.summaryCard, shadow.card]}>
+          <View style={styles.summaryGrid}>
+          {days.map((day) => (
+            <View
+              key={day.date}
+              style={[styles.summaryCard, shadow.card, isWide && { width: summaryCardBasis }]}
+            >
               <View style={styles.dayHeaderRow}>
                 <Text style={styles.dayHeader}>{formatDate(day.date)}</Text>
                 <Text style={styles.dayHeaderTotal}>
@@ -403,7 +410,8 @@ export default function HistoryScreen({ navigation }) {
                 );
               })}
             </View>
-          ))
+          ))}
+          </View>
         ) : mode === 'person' ? (
           // ---------- PER PERSON ----------
           <View style={[styles.personColumns, isWide && styles.personColumnsWide]}>
@@ -538,24 +546,26 @@ export default function HistoryScreen({ navigation }) {
               </View>
             </View>
 
-            <View style={[styles.chartCard, shadow.card]}>
-              <Text style={styles.chartTitle}>🏪 По ресторанти</Text>
-              <RankBarChart data={charts.byRestaurant} colors={colors} color={colors.primary} valueFormatter={(v) => `${v.toFixed(2)} ${CURRENCY}`} />
-            </View>
+            <View style={styles.summaryGrid}>
+              <View style={[styles.chartCard, shadow.card, isDesktop && { width: chartCardBasis }]}>
+                <Text style={styles.chartTitle}>🏪 По ресторанти</Text>
+                <RankBarChart data={charts.byRestaurant} colors={colors} color={colors.primary} valueFormatter={(v) => `${v.toFixed(2)} ${CURRENCY}`} />
+              </View>
 
-            <View style={[styles.chartCard, shadow.card]}>
-              <Text style={styles.chartTitle}>👥 По хора</Text>
-              <RankBarChart data={charts.byPerson} colors={colors} color={colors.accent} valueFormatter={(v) => `${v.toFixed(2)} ${CURRENCY}`} />
-            </View>
+              <View style={[styles.chartCard, shadow.card, isDesktop && { width: chartCardBasis }]}>
+                <Text style={styles.chartTitle}>👥 По хора</Text>
+                <RankBarChart data={charts.byPerson} colors={colors} color={colors.accent} valueFormatter={(v) => `${v.toFixed(2)} ${CURRENCY}`} />
+              </View>
 
-            <View style={[styles.chartCard, shadow.card]}>
-              <Text style={styles.chartTitle}>🍽️ По ястия (брой поръчани)</Text>
-              <RankBarChart data={charts.byDish} colors={colors} color={colors.primary} valueFormatter={(v) => `×${v}`} />
-            </View>
+              <View style={[styles.chartCard, shadow.card, isDesktop && { width: chartCardBasis }]}>
+                <Text style={styles.chartTitle}>🍽️ По ястия (брой поръчани)</Text>
+                <RankBarChart data={charts.byDish} colors={colors} color={colors.primary} valueFormatter={(v) => `×${v}`} />
+              </View>
 
-            <View style={[styles.chartCard, shadow.card]}>
-              <Text style={styles.chartTitle}>📈 Последните 14 дни</Text>
-              <TrendChart days={charts.dailyTotals} colors={colors} />
+              <View style={[styles.chartCard, shadow.card, isDesktop && { width: chartCardBasis }]}>
+                <Text style={styles.chartTitle}>📈 Последните 14 дни</Text>
+                <TrendChart days={charts.dailyTotals} colors={colors} />
+              </View>
             </View>
           </>
         )}
@@ -624,6 +634,11 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   actionText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.text },
 
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
   summaryCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
