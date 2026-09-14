@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { RESTAURANT } from '../data/menu';
 import { confirmDialog } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { firstNameOf } from '../utils/text';
@@ -47,9 +46,6 @@ export default function AppHeader() {
               Здравей, {firstNameOf(user?.name)} 👋
             </Text>
           )}
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {RESTAURANT.name}
-          </Text>
         </View>
         <TouchableOpacity onPress={() => setDensityModalOpen(true)} style={styles.iconBtn} hitSlop={8}>
           <Text style={styles.iconBtnText}>📏</Text>
@@ -85,7 +81,6 @@ const makeStyles = (colors) =>
       alignItems: 'flex-end',
     },
     greeting: { fontSize: font.lg, fontWeight: font.bold, color: colors.text },
-    subtitle: { fontSize: font.sm, color: colors.textMuted, marginTop: 2 },
     iconBtn: {
       width: 34,
       height: 34,
