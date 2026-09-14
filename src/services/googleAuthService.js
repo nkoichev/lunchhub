@@ -7,7 +7,13 @@ const webClientId = Constants.expoConfig?.extra?.googleWebClientId;
 function extractProfile(user) {
   if (!user) return null;
   const meta = user.user_metadata || {};
-  const name = meta.full_name || meta.name || user.email?.split('@')[0] || 'Потребител';
+  // Prefer the first name alone: name-only login asks for just a first name
+  // (see LoginScreen's "напр. Иван" placeholder), and matching against it is
+  // how a Google sign-in links back to that same users row (see
+  // upsertUserFromGoogle). Falling back to the full name here would create a
+  // second, unlinked row for the same person the first time they try Google.
+  const name =
+    meta.given_name || meta.full_name || meta.name || user.email?.split('@')[0] || 'Потребител';
   const avatarUrl = meta.avatar_url || meta.picture || null;
   return { name, avatarUrl };
 }
