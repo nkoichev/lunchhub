@@ -30,7 +30,7 @@ export default function HistoryScreen({ navigation }) {
   const { user } = useAuth();
   const { colors, shadow } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { readWidth } = useResponsive();
+  const { readWidth, maxWidth, isWide } = useResponsive();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -313,7 +313,13 @@ export default function HistoryScreen({ navigation }) {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
-        <View style={{ width: '100%', maxWidth: readWidth, alignSelf: 'center' }}>
+        <View
+          style={{
+            width: '100%',
+            maxWidth: mode === 'person' && isWide ? maxWidth : readWidth,
+            alignSelf: 'center',
+          }}
+        >
         {days.length === 0 ? (
           <EmptyState
             emoji="📜"
@@ -400,94 +406,102 @@ export default function HistoryScreen({ navigation }) {
           ))
         ) : mode === 'person' ? (
           // ---------- PER PERSON ----------
-          <>
-            <View style={styles.peopleWrap}>
-              {people.map((p) => {
-                const active = p.id === personId;
-                const isMe = user && p.id === user.id;
-                return (
-                  <TouchableOpacity
-                    key={p.id}
-                    onPress={() => setPersonId(p.id)}
-                    style={[styles.personChip, active && styles.personChipActive]}
-                  >
-                    {p.id !== ALL_PEOPLE_ID && (
-                      <Avatar uri={avatarByName.get(p.name)} name={p.name} size={18} />
-                    )}
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.personChipText, active && styles.personChipTextActive]}
+          <View style={[styles.personColumns, isWide && styles.personColumnsWide]}>
+            <View style={[styles.personCol, isWide && styles.personColWide]}>
+              <View style={styles.peopleWrap}>
+                {people.map((p) => {
+                  const active = p.id === personId;
+                  const isMe = user && p.id === user.id;
+                  return (
+                    <TouchableOpacity
+                      key={p.id}
+                      onPress={() => setPersonId(p.id)}
+                      style={[styles.personChip, active && styles.personChipActive]}
                     >
-                      {p.name}
-                      {isMe ? ' (аз)' : ''}
+                      {p.id !== ALL_PEOPLE_ID && (
+                        <Avatar uri={avatarByName.get(p.name)} name={p.name} size={18} />
+                      )}
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.personChipText, active && styles.personChipTextActive]}
+                      >
+                        {p.name}
+                        {isMe ? ' (аз)' : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={styles.rangeChips}>
+                {RANGE_OPTIONS.map((r) => (
+                  <TouchableOpacity
+                    key={r.id}
+                    onPress={() => setRangeId(r.id)}
+                    style={[styles.rangeChip, rangeId === r.id && styles.rangeChipActive]}
+                  >
+                    <Text style={[styles.rangeChipText, rangeId === r.id && styles.rangeChipTextActive]}>
+                      {r.label}
                     </Text>
                   </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View style={styles.rangeChips}>
-              {RANGE_OPTIONS.map((r) => (
-                <TouchableOpacity
-                  key={r.id}
-                  onPress={() => setRangeId(r.id)}
-                  style={[styles.rangeChip, rangeId === r.id && styles.rangeChipActive]}
-                >
-                  <Text style={[styles.rangeChipText, rangeId === r.id && styles.rangeChipTextActive]}>
-                    {r.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                ))}
+              </View>
             </View>
 
             {!personId || personCharts.days.length === 0 ? (
-              <EmptyState
-                emoji="👤"
-                title="Няма поръчки"
-                subtitle="Този човек няма поръчки в избрания период."
-              />
+              <View style={[styles.personCol, isWide && { flex: 2 }]}>
+                <EmptyState
+                  emoji="👤"
+                  title="Няма поръчки"
+                  subtitle="Този човек няма поръчки в избрания период."
+                />
+              </View>
             ) : (
               <>
-                <View style={styles.statsRow}>
-                  <View style={[styles.statTile, shadow.card]}>
-                    <Text style={styles.statValue}>
-                      {personCharts.totalSpend.toFixed(2)} {CURRENCY}
-                    </Text>
-                    <Text style={styles.statLabel}>Общо похарчено</Text>
-                  </View>
-                  <View style={[styles.statTile, shadow.card]}>
-                    <Text style={styles.statValue}>{personCharts.orderCount}</Text>
-                    <Text style={styles.statLabel}>Поръчки</Text>
-                  </View>
-                  <View style={[styles.statTile, shadow.card]}>
-                    <Text style={styles.statValueSmall} numberOfLines={3}>
-                      {personCharts.topDishes.length
-                        ? personCharts.topDishes.map((d) => d.label).join(', ')
-                        : '—'}
-                    </Text>
-                    <Text style={styles.statLabel}>
-                      {personCharts.topDishes.length > 1 ? 'Топ ястия' : 'Топ ястие'}
-                    </Text>
+                <View style={[styles.personCol, isWide && styles.personColWide]}>
+                  <View style={[styles.chartCard, shadow.card]}>
+                    <Text style={styles.chartTitle}>🍽️ Топ ястия</Text>
+                    <RankBarChart
+                      data={personCharts.rankedDishes}
+                      colors={colors}
+                      color={colors.accent}
+                      valueFormatter={(v) => `×${v}`}
+                    />
                   </View>
                 </View>
 
-                <View style={[styles.chartCard, shadow.card]}>
-                  <Text style={styles.chartTitle}>📅 Поръчки по дни</Text>
-                  <PersonDishChart days={personCharts.days} colors={colors} />
-                </View>
+                <View style={[styles.personCol, isWide && styles.personColWide]}>
+                  <View style={styles.statsRow}>
+                    <View style={[styles.statTile, shadow.card]}>
+                      <Text style={styles.statValue}>
+                        {personCharts.totalSpend.toFixed(2)} {CURRENCY}
+                      </Text>
+                      <Text style={styles.statLabel}>Общо похарчено</Text>
+                    </View>
+                    <View style={[styles.statTile, shadow.card]}>
+                      <Text style={styles.statValue}>{personCharts.orderCount}</Text>
+                      <Text style={styles.statLabel}>Поръчки</Text>
+                    </View>
+                    <View style={[styles.statTile, shadow.card]}>
+                      <Text style={styles.statValueSmall} numberOfLines={3}>
+                        {personCharts.topDishes.length
+                          ? personCharts.topDishes.map((d) => d.label).join(', ')
+                          : '—'}
+                      </Text>
+                      <Text style={styles.statLabel}>
+                        {personCharts.topDishes.length > 1 ? 'Топ ястия' : 'Топ ястие'}
+                      </Text>
+                    </View>
+                  </View>
 
-                <View style={[styles.chartCard, shadow.card]}>
-                  <Text style={styles.chartTitle}>🍽️ Топ ястия</Text>
-                  <RankBarChart
-                    data={personCharts.rankedDishes}
-                    colors={colors}
-                    color={colors.accent}
-                    valueFormatter={(v) => `×${v}`}
-                  />
+                  <View style={[styles.chartCard, shadow.card]}>
+                    <Text style={styles.chartTitle}>📅 Поръчки по дни</Text>
+                    <PersonDishChart days={personCharts.days} colors={colors} />
+                  </View>
                 </View>
               </>
             )}
-          </>
+          </View>
         ) : (
           // ---------- CHARTS ----------
           <>
@@ -642,6 +656,11 @@ const makeStyles = (colors) => StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
+
+  personColumns: { width: '100%' },
+  personColumnsWide: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.lg },
+  personCol: { width: '100%' },
+  personColWide: { flex: 1, minWidth: 0 },
 
   peopleWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
   personChip: {
