@@ -6,6 +6,7 @@ import { Button } from '../components/ui';
 import Avatar from '../components/Avatar';
 import { alertMessage } from '../utils/confirm';
 import { listUnlinkedUsers } from '../services/authService';
+import { firstNameOf } from '../utils/text';
 import { spacing, radius, font } from '../theme/theme';
 
 // Shown right after a Google sign-in that couldn't be auto-matched to an
@@ -57,7 +58,7 @@ export default function LinkAccountScreen() {
         ) : (
           <Text style={styles.logoEmoji}>👋</Text>
         )}
-        <Text style={styles.title}>Здравей, {pendingGoogleProfile?.name}!</Text>
+        <Text style={styles.title}>Здравей, {firstNameOf(pendingGoogleProfile?.name)}!</Text>
         <Text style={styles.subtitle}>
           Не намерихме автоматично съвпадение. Ти ли си вече в списъка по-долу?
         </Text>

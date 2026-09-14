@@ -152,6 +152,7 @@ select
   o.id              as order_id,
   o.user_id         as user_id,
   u.name            as client,
+  u.avatar_url,
   u.revolut_tag,
   o.order_date,
   o.total,

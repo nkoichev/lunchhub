@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useDensity } from '../context/DensityContext';
 import { EmptyState, Badge } from '../components/ui';
+import Avatar from '../components/Avatar';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
@@ -103,7 +104,7 @@ export default function TodayScreen({ navigation }) {
   const peopleCount = new Set(people.map((p) => p.userId)).size;
   const distinctPeople = Object.values(
     people.reduce((acc, p) => {
-      if (!acc[p.userId]) acc[p.userId] = { userId: p.userId, name: p.name };
+      if (!acc[p.userId]) acc[p.userId] = { userId: p.userId, name: p.name, avatarUrl: p.avatarUrl };
       return acc;
     }, {})
   );
@@ -199,6 +200,7 @@ export default function TodayScreen({ navigation }) {
                     onPress={() => onPickPayer(dp.userId)}
                     style={[styles.payerChip, active && styles.payerChipActive]}
                   >
+                    <Avatar uri={dp.avatarUrl} name={dp.name} size={18} />
                     <Text style={[styles.payerChipText, active && styles.payerChipTextActive]}>
                       {active ? '💰 ' : ''}
                       {dp.name}
@@ -221,10 +223,8 @@ export default function TodayScreen({ navigation }) {
             return (
               <View key={p.orderId} style={[styles.personCard, shadow.card, isMe && styles.myCard, { width: cardBasis }]}>
                 <View style={styles.personHeader}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{p.name.charAt(0).toUpperCase()}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
+                  <Avatar uri={p.avatarUrl} name={p.name} size={34} />
+                  <View style={{ flex: 1, marginLeft: spacing.md }}>
                     <Text style={styles.personName}>
                       {p.name}
                       {isMe ? '  (аз)' : ''}
@@ -382,6 +382,9 @@ const makeStyles = (colors, scale = 1) => {
   },
   payerChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   payerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: spacing.lg,
     paddingVertical: 9,
     borderRadius: radius.pill,
@@ -429,16 +432,6 @@ const makeStyles = (colors, scale = 1) => {
   },
   myCard: { borderColor: colors.primary, borderWidth: 1.5 },
   personHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: s(spacing.sm) },
-  avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  avatarText: { color: colors.primaryDark, fontWeight: font.bold, fontSize: font.md },
   personName: { fontSize: font.md, fontWeight: font.bold, color: colors.text },
   personRest: { fontSize: font.xs, color: colors.primary, fontWeight: font.semibold, marginTop: 1 },
   personTotal: { fontSize: font.md, fontWeight: font.bold, color: colors.accent },

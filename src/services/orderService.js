@@ -195,7 +195,7 @@ export async function fetchTodaySummary() {
   const [{ data, error }, { data: menuItems }] = await Promise.all([
     supabase
       .from('today_orders')
-      .select('client, user_id, total, item_name, quantity, line_total, order_id, restaurant_name, revolut_tag, is_paid'),
+      .select('client, user_id, avatar_url, total, item_name, quantity, line_total, order_id, restaurant_name, revolut_tag, is_paid'),
     supabase.from('menu_items').select('name, calories').not('calories', 'is', null),
   ]);
   if (error) throw new Error(error.message);
@@ -217,6 +217,7 @@ export async function fetchTodaySummary() {
       map[key] = {
         name: row.client,
         userId: row.user_id,
+        avatarUrl: row.avatar_url,
         items: [],
         total: 0,
         totalCalories: 0,
