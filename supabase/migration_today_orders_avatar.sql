@@ -12,7 +12,6 @@ select
   o.id              as order_id,
   o.user_id         as user_id,
   u.name            as client,
-  u.avatar_url,
   u.revolut_tag,
   o.order_date,
   o.total,
@@ -21,7 +20,8 @@ select
   o.restaurant_name,
   oi.item_name,
   oi.quantity,
-  oi.line_total
+  oi.line_total,
+  u.avatar_url
 from public.orders o
 join public.users u        on u.id = o.user_id
 join public.order_items oi on oi.order_id = o.id
