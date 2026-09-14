@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -38,10 +38,18 @@ export default function AppHeader() {
       <View style={[styles.inner, { maxWidth, alignSelf: 'center', width: '100%' }]}>
         <Avatar uri={user?.avatarUrl} name={user?.name} size={36} />
         <View style={{ flex: 1, marginLeft: spacing.sm }}>
-          <Text style={styles.greeting} numberOfLines={1}>
-            Здравей, {firstNameOf(user?.name)} 👋
+          {/* The greeting line doesn't fit next to the avatar + 4 header
+              buttons on a phone-width screen — web has the room, native
+              doesn't, so it's web-only. The avatar photo alone already
+              identifies who's logged in on native. */}
+          {Platform.OS === 'web' && (
+            <Text style={styles.greeting} numberOfLines={1}>
+              Здравей, {firstNameOf(user?.name)} 👋
+            </Text>
+          )}
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {RESTAURANT.name}
           </Text>
-          <Text style={styles.subtitle}>{RESTAURANT.name}</Text>
         </View>
         <TouchableOpacity onPress={() => setDensityModalOpen(true)} style={styles.iconBtn} hitSlop={8}>
           <Text style={styles.iconBtnText}>📏</Text>
