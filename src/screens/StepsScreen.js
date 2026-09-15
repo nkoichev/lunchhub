@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Device from 'expo-device';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useResponsive } from '../hooks/useResponsive';
@@ -32,6 +34,12 @@ const COMPARE_DAYS = 14;   // fixed head-to-head window
 const TREND_DAYS = 14;     // fixed personal-trend window
 const MAX_COMPARE_PEOPLE = 6;
 
+const SAMSUNG_HINT_DISMISSED_KEY = 'lunchhub.samsungHint.dismissed';
+// Samsung Health owns the step sensor on Samsung phones and, unlike stock
+// Android, doesn't feed Health Connect unless the user opts in there — so a
+// stuck-at-0 count is usually a Samsung Health setting, not a bug here.
+const isSamsungDevice = Platform.OS === 'android' && /samsung/i.test(Device.manufacturer || '');
+
 const fmt = (n) => Math.round(n || 0).toLocaleString('bg-BG');
 
 function longDate(dateStr) {
@@ -52,6 +60,17 @@ export default function StepsScreen() {
   const [mode, setMode] = useState('today'); // 'today' | 'leaderboard' | 'compare' | 'me'
   const [rangeId, setRangeId] = useState('7');
   const [picked, setPicked] = useState(null); // Set<userId> | null (=auto top N)
+  const [samsungHintDismissed, setSamsungHintDismissed] = useState(null); // null = not loaded yet
+
+  useEffect(() => {
+    if (!isSamsungDevice) return;
+    AsyncStorage.getItem(SAMSUNG_HINT_DISMISSED_KEY).then((v) => setSamsungHintDismissed(v === '1'));
+  }, []);
+
+  const dismissSamsungHint = () => {
+    setSamsungHintDismissed(true);
+    AsyncStorage.setItem(SAMSUNG_HINT_DISMISSED_KEY, '1').catch(() => {});
+  };
 
   const load = useCallback(async () => {
     try {
@@ -243,6 +262,9 @@ export default function StepsScreen() {
     };
   }, [rows, user, rangedRows]);
 
+  const showSamsungHint =
+    isSamsungDevice && samsungHintDismissed === false && (myTodaySteps == null || myTodaySteps === 0);
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -321,6 +343,21 @@ export default function StepsScreen() {
                   </Text>
                 )}
               </View>
+
+              {showSamsungHint && (
+                <View style={[styles.hintCard, shadow.card]}>
+                  <Text style={styles.hintCardTitle}>📱 Samsung телефон?</Text>
+                  <Text style={styles.hintCardText}>
+                    Health Connect показва 0, защото Samsung Health обикновено не му подава стъпки
+                    автоматично. Отвори Samsung Health → Settings → Data permissions/Connected services
+                    и разреши „Steps“ да се синхронизира с Health Connect. Провери и Device Care —
+                    „Sleeping apps“, за да не спира Samsung Health на заден фон.
+                  </Text>
+                  <TouchableOpacity style={styles.hintCardBtn} onPress={dismissSamsungHint}>
+                    <Text style={styles.hintCardBtnText}>Разбрах</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               <View style={[styles.chartCard, shadow.card]}>
                 <Text style={styles.chartTitle}>🏆 Класация за днес</Text>
@@ -555,6 +592,26 @@ const makeStyles = (colors) =>
       alignItems: 'center',
     },
     syncBtnText: { fontSize: font.base, fontWeight: font.bold, color: colors.primary },
+
+    hintCard: {
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: radius.md,
+      padding: spacing.lg,
+      marginBottom: spacing.md,
+      borderWidth: 1.5,
+      borderColor: colors.accent,
+    },
+    hintCardTitle: { fontSize: font.base, fontWeight: font.bold, color: colors.text, marginBottom: spacing.xs },
+    hintCardText: { fontSize: font.sm, color: colors.textMuted, lineHeight: 20 },
+    hintCardBtn: {
+      alignSelf: 'flex-start',
+      marginTop: spacing.md,
+      paddingVertical: 8,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.pill,
+      backgroundColor: colors.accent,
+    },
+    hintCardBtnText: { fontSize: font.sm, fontWeight: font.bold, color: colors.onPrimary },
 
     statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
     statTile: {
