@@ -29,10 +29,21 @@ export async function fetchDayPayer(dateString) {
 // not just today's live picker state.
 export async function setDayPayer(dateString, payerUserId) {
   if (!isSupabaseConfigured) throw new Error('Базата данни не е настроена.');
-  const { error: upsertErr } = await supabase
-    .from('day_payers')
-    .upsert({ order_date: dateString, payer_user_id: payerUserId }, { onConflict: 'order_date' });
-  if (upsertErr) throw new Error(upsertErr.message);
+
+  if (payerUserId) {
+    const { error: upsertErr } = await supabase
+      .from('day_payers')
+      .upsert({ order_date: dateString, payer_user_id: payerUserId }, { onConflict: 'order_date' });
+    if (upsertErr) throw new Error(upsertErr.message);
+  } else {
+    // day_payers.payer_user_id is NOT NULL, so unsetting the payer means
+    // removing the row rather than upserting a null value.
+    const { error: deleteErr } = await supabase
+      .from('day_payers')
+      .delete()
+      .eq('order_date', dateString);
+    if (deleteErr) throw new Error(deleteErr.message);
+  }
 
   const { error: stampErr } = await supabase
     .from('orders')

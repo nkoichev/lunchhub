@@ -104,7 +104,9 @@ export default function TodayScreen({ navigation }) {
   const peopleCount = new Set(people.map((p) => p.userId)).size;
   const distinctPeople = Object.values(
     people.reduce((acc, p) => {
-      if (!acc[p.userId]) acc[p.userId] = { userId: p.userId, name: p.name, avatarUrl: p.avatarUrl };
+      if (!acc[p.userId]) {
+        acc[p.userId] = { userId: p.userId, name: p.name, avatarUrl: p.avatarUrl, revolutTag: p.revolutTag };
+      }
       return acc;
     }, {})
   );
@@ -112,6 +114,13 @@ export default function TodayScreen({ navigation }) {
 
   const onPickPayer = async (userId) => {
     const next = payerUserId === userId ? null : userId; // tap again to unset
+    if (next) {
+      const target = distinctPeople.find((dp) => dp.userId === next);
+      if (!target?.revolutTag) {
+        alertMessage('Няма Revolut таг', `${target?.name || 'Този човек'} още не си е задал Revolut таг в профила си.`);
+        return;
+      }
+    }
     setPayerBusy(true);
     setPayerUserId(next);
     try {
@@ -193,12 +202,13 @@ export default function TodayScreen({ navigation }) {
             <View style={styles.payerChips}>
               {distinctPeople.map((dp) => {
                 const active = dp.userId === payerUserId;
+                const noTag = !dp.revolutTag;
                 return (
                   <TouchableOpacity
                     key={dp.userId}
                     disabled={payerBusy}
                     onPress={() => onPickPayer(dp.userId)}
-                    style={[styles.payerChip, active && styles.payerChipActive]}
+                    style={[styles.payerChip, active && styles.payerChipActive, noTag && styles.payerChipDisabled]}
                   >
                     <Avatar uri={dp.avatarUrl} name={dp.name} size={18} />
                     <Text style={[styles.payerChipText, active && styles.payerChipTextActive]}>
@@ -393,6 +403,7 @@ const makeStyles = (colors, scale = 1) => {
     borderColor: colors.border,
   },
   payerChipActive: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  payerChipDisabled: { opacity: 0.45 },
   payerChipText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.textMuted },
   payerChipTextActive: { color: colors.primaryDark },
   payerHint: { fontSize: font.xs, color: colors.textFaint, marginTop: spacing.sm },
