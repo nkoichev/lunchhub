@@ -26,6 +26,15 @@ import {
 } from '../data/menu';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
 
+function formatUpdatedAt(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const time = d.toLocaleTimeString('bg-BG', { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString()) return `днес в ${time}`;
+  const date = d.toLocaleDateString('bg-BG', { day: '2-digit', month: '2-digit' });
+  return `на ${date} в ${time}`;
+}
+
 export default function MenuScreen({ navigation }) {
   const { qtyOf, add, decrement, count, total, clear, list } = useCart();
   const { restaurants, selected, setSelected } = useRestaurant();
@@ -106,6 +115,22 @@ export default function MenuScreen({ navigation }) {
 
   const centered = { width: '100%', maxWidth, alignSelf: 'center' };
   const cardBasis = columns === 1 ? '100%' : columns === 2 ? '48%' : '31.5%';
+
+  // Freshest import timestamp among the currently shown items — the only
+  // way to tell a live menu apart from stale leftover data (see the
+  // Щастливеца incident where the daily Gmail→Gemini import silently
+  // failed and nobody could tell from the app). Only Щастливеца has that
+  // daily auto-import; every other restaurant's menu is entered once and
+  // stays static on purpose, so "last updated" doesn't mean anything there
+  // — showing it would just be noise (or a false stale warning).
+  const hasAutoImportedMenu = selected?.id === 'shtastlivetsa';
+  const lastUpdated = hasAutoImportedMenu
+    ? items.reduce((max, it) => (it.updated_at && (!max || it.updated_at > max) ? it.updated_at : max), null)
+    : null;
+  // Only flagged as stale when browsing *today's* menu specifically — a
+  // future/past weekday's rows are expected to carry an older timestamp,
+  // from that day's own last import.
+  const isStale = lastUpdated && day === todayIndex() && new Date(lastUpdated).toDateString() !== new Date().toDateString();
 
   const renderDish = (item) => {
     const qty = qtyOf(item.name);
@@ -195,6 +220,11 @@ export default function MenuScreen({ navigation }) {
             );
           })}
         </View>
+        {lastUpdated && (
+          <Text style={[styles.updatedText, centered, isStale && styles.updatedTextStale]}>
+            {isStale ? '⚠️ Може да не е обновено — ' : ''}Обновено {formatUpdatedAt(lastUpdated)}
+          </Text>
+        )}
       </View>
 
       {/* Search + sort toggle */}
@@ -332,6 +362,13 @@ const makeStyles = (colors, scale = 1) => {
     backgroundColor: colors.primary,
     marginTop: 3,
   },
+  updatedText: {
+    fontSize: font.xs,
+    color: colors.textFaint,
+    textAlign: 'center',
+    paddingBottom: spacing.sm,
+  },
+  updatedTextStale: { color: colors.danger, fontWeight: font.semibold },
   toolsBar: {
     flexDirection: 'row',
     alignItems: 'center',

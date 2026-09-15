@@ -42,7 +42,10 @@ create table if not exists public.menu_items (
   day_index      int  not null check (day_index between 1 and 7),
   name           text not null,
   price          numeric(6,2) not null default 0,
-  category       text default 'main'
+  category       text default 'main',
+  -- Import (delete+insert) time — the only way to tell a freshly imported
+  -- day's menu apart from stale leftover data from a previous week.
+  updated_at     timestamptz not null default now()
 );
 create index if not exists menu_items_day_idx on public.menu_items(day_index);
 create index if not exists menu_items_name_idx on public.menu_items(name);
