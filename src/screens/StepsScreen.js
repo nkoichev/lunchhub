@@ -72,6 +72,18 @@ export default function StepsScreen() {
     AsyncStorage.setItem(SAMSUNG_HINT_DISMISSED_KEY, '1').catch(() => {});
   };
 
+  // Deep-links straight into Health Connect's "manage app permissions" screen
+  // for Samsung Health — the exact toggle the hint is telling the user to
+  // find, instead of making them navigate Samsung Health's own settings.
+  const onOpenSamsungHealthConnectSettings = () => {
+    try {
+      const mod = require('react-native-health-connect');
+      mod.openHealthConnectDataManagement('com.sec.android.app.shealth');
+    } catch (_) {
+      alertMessage('Health Connect', 'Health Connect не можа да се отвори. Провери дали е инсталиран.');
+    }
+  };
+
   const load = useCallback(async () => {
     try {
       setRows(await fetchAllSteps());
@@ -353,9 +365,14 @@ export default function StepsScreen() {
                     и разреши „Steps“ да се синхронизира с Health Connect. Провери и Device Care —
                     „Sleeping apps“, за да не спира Samsung Health на заден фон.
                   </Text>
-                  <TouchableOpacity style={styles.hintCardBtn} onPress={dismissSamsungHint}>
-                    <Text style={styles.hintCardBtnText}>Разбрах</Text>
-                  </TouchableOpacity>
+                  <View style={styles.hintCardBtnRow}>
+                    <TouchableOpacity style={styles.hintCardBtn} onPress={onOpenSamsungHealthConnectSettings}>
+                      <Text style={styles.hintCardBtnText}>⚙️ Отвори настройките</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.hintCardBtnSecondary} onPress={dismissSamsungHint}>
+                      <Text style={styles.hintCardBtnSecondaryText}>Разбрах</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
@@ -603,15 +620,23 @@ const makeStyles = (colors) =>
     },
     hintCardTitle: { fontSize: font.base, fontWeight: font.bold, color: colors.text, marginBottom: spacing.xs },
     hintCardText: { fontSize: font.sm, color: colors.textMuted, lineHeight: 20 },
+    hintCardBtnRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
     hintCardBtn: {
-      alignSelf: 'flex-start',
-      marginTop: spacing.md,
       paddingVertical: 8,
       paddingHorizontal: spacing.lg,
       borderRadius: radius.pill,
       backgroundColor: colors.accent,
     },
     hintCardBtnText: { fontSize: font.sm, fontWeight: font.bold, color: colors.onPrimary },
+    hintCardBtnSecondary: {
+      paddingVertical: 8,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.pill,
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    hintCardBtnSecondaryText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.textMuted },
 
     statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
     statTile: {
