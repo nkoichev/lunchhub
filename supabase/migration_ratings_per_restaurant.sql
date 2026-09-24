@@ -55,3 +55,6 @@ from public.ratings
 group by restaurant_id, item_name;
 
 notify pgrst, 'reload schema';
+
+-- Explicit Data API grants (Supabase stops auto-granting new public objects on 2026-10-30)
+grant select on public.rating_summary to anon, authenticated, service_role;

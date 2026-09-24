@@ -18,3 +18,7 @@ drop policy if exists "anon_all_push_tokens" on public.push_tokens;
 create policy "anon_all_push_tokens" on public.push_tokens for all using (true) with check (true);
 
 notify pgrst, 'reload schema';
+
+-- Explicit Data API grants (Supabase stops auto-granting new public tables on 2026-10-30)
+grant select on public.push_tokens to anon;
+grant select, insert, update, delete on public.push_tokens to authenticated, service_role;

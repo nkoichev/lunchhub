@@ -27,3 +27,6 @@ where o.order_date = current_date;
 alter table public.users drop column if exists blink_phone;
 
 notify pgrst, 'reload schema';
+
+-- Explicit Data API grants (Supabase stops auto-granting new public objects on 2026-10-30)
+grant select on public.today_orders to anon, authenticated, service_role;

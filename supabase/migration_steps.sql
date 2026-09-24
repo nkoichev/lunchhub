@@ -36,3 +36,7 @@ exception when duplicate_object then null;
 end $$;
 
 notify pgrst, 'reload schema';
+
+-- Explicit Data API grants (Supabase stops auto-granting new public tables on 2026-10-30)
+grant select on public.daily_steps to anon;
+grant select, insert, update, delete on public.daily_steps to authenticated, service_role;

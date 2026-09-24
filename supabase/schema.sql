@@ -202,3 +202,27 @@ alter publication supabase_realtime add table public.orders;
 alter publication supabase_realtime add table public.order_items;
 alter publication supabase_realtime add table public.ratings;
 alter publication supabase_realtime add table public.daily_steps;
+
+-- Explicit Data API grants (Supabase stops auto-granting new public tables on 2026-10-30)
+grant select on public.users to anon;
+grant select, insert, update, delete on public.users to authenticated, service_role;
+grant select on public.restaurants to anon;
+grant select, insert, update, delete on public.restaurants to authenticated, service_role;
+grant select on public.menu_items to anon;
+grant select, insert, update, delete on public.menu_items to authenticated, service_role;
+grant select on public.orders to anon;
+grant select, insert, update, delete on public.orders to authenticated, service_role;
+grant select on public.day_payers to anon;
+grant select, insert, update, delete on public.day_payers to authenticated, service_role;
+grant select on public.order_items to anon;
+grant select, insert, update, delete on public.order_items to authenticated, service_role;
+grant select on public.ratings to anon;
+grant select, insert, update, delete on public.ratings to authenticated, service_role;
+grant select on public.push_tokens to anon;
+grant select, insert, update, delete on public.push_tokens to authenticated, service_role;
+grant select on public.daily_steps to anon;
+grant select, insert, update, delete on public.daily_steps to authenticated, service_role;
+
+-- Explicit Data API grants (Supabase stops auto-granting new public objects on 2026-10-30)
+grant select on public.rating_summary to anon, authenticated, service_role;
+grant select on public.today_orders to anon, authenticated, service_role;
