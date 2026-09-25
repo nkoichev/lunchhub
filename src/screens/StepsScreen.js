@@ -34,11 +34,14 @@ const COMPARE_DAYS = 14;   // fixed head-to-head window
 const TREND_DAYS = 14;     // fixed personal-trend window
 const MAX_COMPARE_PEOPLE = 6;
 
-const SAMSUNG_HINT_DISMISSED_KEY = 'lunchhub.samsungHint.dismissed';
+const SYNC_HINT_DISMISSED_KEY = 'lunchhub.syncHint.dismissed';
+const isAndroid = Platform.OS === 'android';
 // Samsung Health owns the step sensor on Samsung phones and, unlike stock
 // Android, doesn't feed Health Connect unless the user opts in there — so a
-// stuck-at-0 count is usually a Samsung Health setting, not a bug here.
-const isSamsungDevice = Platform.OS === 'android' && /samsung/i.test(Device.manufacturer || '');
+// stuck-at-0 count is usually a Samsung Health setting, not a bug here. Other
+// brands' fitness bands/watches have the same failure mode via their own
+// companion app, just without a single well-known package name to target.
+const isSamsungDevice = isAndroid && /samsung/i.test(Device.manufacturer || '');
 
 const fmt = (n) => Math.round(n || 0).toLocaleString('bg-BG');
 
@@ -60,16 +63,16 @@ export default function StepsScreen() {
   const [mode, setMode] = useState('today'); // 'today' | 'leaderboard' | 'compare' | 'me'
   const [rangeId, setRangeId] = useState('7');
   const [picked, setPicked] = useState(null); // Set<userId> | null (=auto top N)
-  const [samsungHintDismissed, setSamsungHintDismissed] = useState(null); // null = not loaded yet
+  const [syncHintDismissed, setSyncHintDismissed] = useState(null); // null = not loaded yet
 
   useEffect(() => {
-    if (!isSamsungDevice) return;
-    AsyncStorage.getItem(SAMSUNG_HINT_DISMISSED_KEY).then((v) => setSamsungHintDismissed(v === '1'));
+    if (!isAndroid) return;
+    AsyncStorage.getItem(SYNC_HINT_DISMISSED_KEY).then((v) => setSyncHintDismissed(v === '1'));
   }, []);
 
-  const dismissSamsungHint = () => {
-    setSamsungHintDismissed(true);
-    AsyncStorage.setItem(SAMSUNG_HINT_DISMISSED_KEY, '1').catch(() => {});
+  const dismissSyncHint = () => {
+    setSyncHintDismissed(true);
+    AsyncStorage.setItem(SYNC_HINT_DISMISSED_KEY, '1').catch(() => {});
   };
 
   // Deep-links straight into Health Connect's "manage app permissions" screen
@@ -79,6 +82,18 @@ export default function StepsScreen() {
     try {
       const mod = require('react-native-health-connect');
       mod.openHealthConnectDataManagement('com.sec.android.app.shealth');
+    } catch (_) {
+      alertMessage('Health Connect', 'Health Connect не можа да се отвори. Провери дали е инсталиран.');
+    }
+  };
+
+  // Generic fallback for non-Samsung phones (fitness bands/watches whose
+  // companion app we can't name in advance) — opens Health Connect's home,
+  // where every connected app and its permissions are listed.
+  const onOpenHealthConnectSettings = () => {
+    try {
+      const mod = require('react-native-health-connect');
+      mod.openHealthConnectSettings();
     } catch (_) {
       alertMessage('Health Connect', 'Health Connect не можа да се отвори. Провери дали е инсталиран.');
     }
@@ -274,8 +289,8 @@ export default function StepsScreen() {
     };
   }, [rows, user, rangedRows]);
 
-  const showSamsungHint =
-    isSamsungDevice && samsungHintDismissed === false && (myTodaySteps == null || myTodaySteps === 0);
+  const showSyncHint =
+    isAndroid && syncHintDismissed === false && (myTodaySteps == null || myTodaySteps === 0);
 
   if (loading) {
     return (
@@ -356,20 +371,38 @@ export default function StepsScreen() {
                 )}
               </View>
 
-              {showSamsungHint && (
+              {showSyncHint && (
                 <View style={[styles.hintCard, shadow.card]}>
-                  <Text style={styles.hintCardTitle}>📱 Samsung телефон?</Text>
-                  <Text style={styles.hintCardText}>
-                    Health Connect показва 0, защото Samsung Health обикновено не му подава стъпки
-                    автоматично. Отвори Samsung Health → Settings → Data permissions/Connected services
-                    и разреши „Steps“ да се синхронизира с Health Connect. Провери и Device Care —
-                    „Sleeping apps“, за да не спира Samsung Health на заден фон.
-                  </Text>
+                  {isSamsungDevice ? (
+                    <>
+                      <Text style={styles.hintCardTitle}>📱 Samsung телефон?</Text>
+                      <Text style={styles.hintCardText}>
+                        Health Connect показва 0, защото Samsung Health обикновено не му подава стъпки
+                        автоматично. Отвори Samsung Health → Settings → Data permissions/Connected services
+                        и разреши „Steps“ да се синхронизира с Health Connect. Провери и Device Care —
+                        „Sleeping apps“, за да не спира Samsung Health на заден фон.
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.hintCardTitle}>⌚ Използваш фитнес гривна/часовник?</Text>
+                      <Text style={styles.hintCardText}>
+                        Health Connect показва 0, защото приложението на гривната/часовника (Mi Fitness,
+                        Zepp, Galaxy Wear, Fitbit и т.н.) обикновено не подава стъпки към Health Connect
+                        автоматично. В настройките на това приложение потърси опция за синхронизация с
+                        Health Connect и я разреши — по-долу можеш да отвориш направо Health Connect, за
+                        да видиш кои приложения са свързани и какви права имат.
+                      </Text>
+                    </>
+                  )}
                   <View style={styles.hintCardBtnRow}>
-                    <TouchableOpacity style={styles.hintCardBtn} onPress={onOpenSamsungHealthConnectSettings}>
+                    <TouchableOpacity
+                      style={styles.hintCardBtn}
+                      onPress={isSamsungDevice ? onOpenSamsungHealthConnectSettings : onOpenHealthConnectSettings}
+                    >
                       <Text style={styles.hintCardBtnText}>⚙️ Отвори настройките</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.hintCardBtnSecondary} onPress={dismissSamsungHint}>
+                    <TouchableOpacity style={styles.hintCardBtnSecondary} onPress={dismissSyncHint}>
                       <Text style={styles.hintCardBtnSecondaryText}>Разбрах</Text>
                     </TouchableOpacity>
                   </View>
