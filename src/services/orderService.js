@@ -272,33 +272,36 @@ export async function fetchHistory(user) {
   }));
 }
 
-// Everyone's order history, newest first (for the shared History tab).
-export async function fetchAllHistory(limit = 200) {
+// Everyone's full order history, newest first (for the shared History tab).
+// Fetched in pages because PostgREST caps each response (1000 rows by
+// default); items are embedded so no huge `in(order_id, ...)` list is needed.
+const HISTORY_PAGE_SIZE = 1000;
+
+export async function fetchAllHistory() {
   if (!isSupabaseConfigured) return [];
 
-  const { data: orders, error } = await supabase
-    .from('orders')
-    .select('id, order_date, total, restaurant_name, created_at, user_id')
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  if (error) throw new Error(error.message);
-  if (!orders?.length) return [];
+  const orders = [];
+  for (let from = 0; ; from += HISTORY_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(
+        'id, order_date, total, restaurant_name, created_at, user_id, order_items(item_name, quantity, line_total)'
+      )
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + HISTORY_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    orders.push(...(data || []));
+    if (!data || data.length < HISTORY_PAGE_SIZE) break;
+  }
+  if (!orders.length) return [];
 
-  const orderIds = orders.map((o) => o.id);
   const userIds = [...new Set(orders.map((o) => o.user_id))];
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, name, avatar_url')
+    .in('id', userIds);
 
-  const [{ data: items }, { data: users }] = await Promise.all([
-    supabase
-      .from('order_items')
-      .select('order_id, item_name, quantity, line_total')
-      .in('order_id', orderIds),
-    supabase.from('users').select('id, name, avatar_url').in('id', userIds),
-  ]);
-
-  const byOrder = {};
-  (items || []).forEach((it) => {
-    (byOrder[it.order_id] ??= []).push(it);
-  });
   const nameById = {};
   const avatarById = {};
   (users || []).forEach((u) => {
@@ -314,6 +317,6 @@ export async function fetchAllHistory(limit = 200) {
     userId: o.user_id,
     userName: nameById[o.user_id] ?? '—',
     userAvatar: avatarById[o.user_id] ?? null,
-    items: byOrder[o.id] ?? [],
+    items: o.order_items ?? [],
   }));
 }

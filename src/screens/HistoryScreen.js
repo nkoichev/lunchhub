@@ -36,7 +36,7 @@ export default function HistoryScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [mode, setMode] = useState('person'); // 'person' | 'summary' | 'charts'
-  const [rangeId, setRangeId] = useState('30');
+  const [rangeId, setRangeId] = useState('all');
   const [personId, setPersonId] = useState(() => user?.id ?? ALL_PEOPLE_ID);
   const [expandedRows, setExpandedRows] = useState(() => new Set());
 
@@ -51,7 +51,7 @@ export default function HistoryScreen({ navigation }) {
 
   const load = useCallback(async () => {
     try {
-      setOrders(await fetchAllHistory(300));
+      setOrders(await fetchAllHistory());
     } catch (_) {
       setOrders([]);
     } finally {
