@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
 import { useCart } from '../context/CartContext';
 import { useRestaurant } from '../context/RestaurantContext';
@@ -25,6 +24,7 @@ import {
   CATEGORY_ORDER,
 } from '../data/menu';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
+import LogoSpinner from '../components/LogoSpinner';
 
 function formatUpdatedAt(iso) {
   const d = new Date(iso);
@@ -253,7 +253,7 @@ export default function MenuScreen({ navigation }) {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <LogoSpinner />
         </View>
       ) : (
         <ScrollView

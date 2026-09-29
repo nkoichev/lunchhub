@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchTodaySummary, deleteOrder, todayDateString } from '../services/orderService';
 import { fetchDayPayer, setDayPayer, markOrderPaid } from '../services/paymentService';
@@ -11,6 +11,7 @@ import Avatar from '../components/Avatar';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
+import LogoSpinner from '../components/LogoSpinner';
 
 export default function TodayScreen({ navigation }) {
   const { user } = useAuth();
@@ -164,7 +165,7 @@ export default function TodayScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <LogoSpinner />
       </View>
     );
   }

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
-  ActivityIndicator,
   TouchableOpacity,
   Platform,
 } from 'react-native';
@@ -23,6 +22,7 @@ import { alertMessage } from '../utils/confirm';
 import { spacing, radius, font } from '../theme/theme';
 import { fetchAllSteps, todayDateString, dateStringDaysAgo } from '../services/stepService';
 import { syncDeviceSteps, syncDeviceStepsNow } from '../services/stepSyncService';
+import LogoSpinner from '../components/LogoSpinner';
 
 const RANGE_OPTIONS = [
   { id: '7', label: '7 дни', days: 7 },
@@ -295,7 +295,7 @@ export default function StepsScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <LogoSpinner />
       </View>
     );
   }

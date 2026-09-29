@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchHistory } from '../services/orderService';
 import { fetchMyRatings, rateDish, fetchTopRated } from '../services/ratingService';
@@ -10,6 +10,7 @@ import { StarRating, EmptyState, Badge } from '../components/ui';
 import RatingDetailsModal from '../components/RatingDetailsModal';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font } from '../theme/theme';
+import LogoSpinner from '../components/LogoSpinner';
 
 export default function RatingsScreen() {
   const { user } = useAuth();
@@ -85,7 +86,7 @@ export default function RatingsScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <LogoSpinner />
       </View>
     );
   }

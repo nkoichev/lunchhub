@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { fetchOrder, updateOrder, deleteOrder } from '../services/orderService';
@@ -14,6 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
+import LogoSpinner from '../components/LogoSpinner';
 
 export default function EditOrderScreen({ route, navigation }) {
   const { orderId } = route.params;
@@ -100,7 +100,7 @@ export default function EditOrderScreen({ route, navigation }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <LogoSpinner />
       </View>
     );
   }

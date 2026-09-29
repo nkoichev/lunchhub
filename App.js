@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ActivityIndicator, Platform, Pressable, Animated, Easing } from 'react-native';
+import { View, Text, Platform, Pressable, Animated, Easing } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -14,6 +14,7 @@ import { RestaurantProvider } from './src/context/RestaurantContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { DensityProvider } from './src/context/DensityContext';
 import AppHeader from './src/components/AppHeader';
+import LogoSpinner from './src/components/LogoSpinner';
 
 import PinGateScreen from './src/screens/PinGateScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -257,7 +258,7 @@ function Gate() {
 
   const spinner = (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
-      <ActivityIndicator size="large" color={colors.primary} />
+      <LogoSpinner />
     </View>
   );
 

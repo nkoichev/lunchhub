@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchAllHistory, deleteOrder } from '../services/orderService';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,7 @@ import PersonDishChart from '../components/charts/PersonDishChart';
 import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
+import LogoSpinner from '../components/LogoSpinner';
 
 const ALL_PEOPLE_ID = '__all__';
 
@@ -275,7 +276,7 @@ export default function HistoryScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <LogoSpinner />
       </View>
     );
   }

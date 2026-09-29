@@ -30,6 +30,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import { isSupabaseConfigured } from '../config/supabase';
 import { WEEKDAYS, dayName, CATEGORY_LABELS } from '../data/menu';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
+import LogoSpinner from '../components/LogoSpinner';
 
 export default function ManageScreen() {
   const { restaurants, selected, setSelected, reload } = useRestaurant();
@@ -216,7 +217,7 @@ export default function ManageScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <LogoSpinner />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
