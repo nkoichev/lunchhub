@@ -9,24 +9,24 @@ import { listUnlinkedUsers } from '../services/authService';
 import { firstNameOf } from '../utils/text';
 import { spacing, radius, font } from '../theme/theme';
 
-// Shown right after a Google sign-in that couldn't be auto-matched to an
-// existing users row (new Google identity, no name match) — see
-// upsertUserFromGoogle's needsLink case. Picking an existing person links
-// this Google account to their row (keeping their order history intact)
-// instead of creating a duplicate profile; this only ever happens once per
-// Google account, since the link is remembered afterwards.
+// Shown right after a Google/Facebook sign-in that couldn't be auto-matched
+// to an existing users row (new identity, no name match) — see
+// upsertUserFromSocial's needsLink case. Picking an existing person links
+// this account to their row (keeping their order history intact) instead of
+// creating a duplicate profile; this only ever happens once per account,
+// since the link is remembered afterwards.
 export default function LinkAccountScreen() {
-  const { pendingGoogleProfile, linkPendingTo, createNewFromPending, cancelPendingLink } = useAuth();
+  const { pendingProfile, linkPendingTo, createNewFromPending, cancelPendingLink } = useAuth();
   const { colors, shadow } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [people, setPeople] = useState(null); // null = loading
   const [busyId, setBusyId] = useState(null); // 'new' | user id | null
 
   useEffect(() => {
-    listUnlinkedUsers()
+    listUnlinkedUsers(pendingProfile?.provider)
       .then(setPeople)
       .catch(() => setPeople([]));
-  }, []);
+  }, [pendingProfile?.provider]);
 
   const onPick = async (id) => {
     setBusyId(id);
@@ -53,12 +53,12 @@ export default function LinkAccountScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.headerWrap}>
-        {pendingGoogleProfile?.avatarUrl ? (
-          <Avatar uri={pendingGoogleProfile.avatarUrl} name={pendingGoogleProfile.name} size={64} />
+        {pendingProfile?.avatarUrl ? (
+          <Avatar uri={pendingProfile.avatarUrl} name={pendingProfile.name} size={64} />
         ) : (
           <Text style={styles.logoEmoji}>👋</Text>
         )}
-        <Text style={styles.title}>Здравей, {firstNameOf(pendingGoogleProfile?.name)}!</Text>
+        <Text style={styles.title}>Здравей, {firstNameOf(pendingProfile?.name)}!</Text>
         <Text style={styles.subtitle}>
           Не намерихме автоматично съвпадение. Ти ли си вече в списъка по-долу?
         </Text>

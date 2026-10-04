@@ -1,13 +1,19 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   loginWithName,
-  upsertUserFromGoogle,
-  linkGoogleAccount,
-  createGoogleUser,
+  upsertUserFromSocial,
+  linkSocialAccount,
+  createSocialUser,
 } from '../services/authService';
 import { registerForPushNotifications } from '../services/pushService';
-import { signInWithGoogle, signOutGoogle, extractProfileFromSession } from '../services/googleAuthService';
+import {
+  signInWithGoogle,
+  signInWithFacebook,
+  signOutSocial,
+  extractProfileFromSession,
+} from '../services/socialAuthService';
 import { supabase } from '../config/supabase';
 
 const AuthContext = createContext(null);
@@ -16,11 +22,11 @@ const STORAGE_KEY = 'lunchhub.user';
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [booting, setBooting] = useState(true);
-  // Set when a Google sign-in can't be auto-matched to a users row (see
-  // upsertUserFromGoogle's needsLink case) — Gate shows a picker screen
+  // Set when a Google/Facebook sign-in can't be auto-matched to a users row
+  // (see upsertUserFromSocial's needsLink case) — Gate shows a picker screen
   // instead of the main app until this resolves via linkPendingTo /
   // createNewFromPending.
-  const [pendingGoogleProfile, setPendingGoogleProfile] = useState(null);
+  const [pendingProfile, setPendingProfile] = useState(null);
 
   const persist = async (u) => {
     setUser(u);
@@ -28,10 +34,10 @@ export function AuthProvider({ children }) {
     registerForPushNotifications(u);
   };
 
-  // Shared by loginWithGoogle and the web OAuth-redirect listener below.
-  const resolveGoogleUpsert = async (result) => {
+  // Shared by loginWithGoogle/Facebook and the web OAuth-redirect listener.
+  const resolveSocialUpsert = async (result) => {
     if (result.needsLink) {
-      setPendingGoogleProfile(result.profile);
+      setPendingProfile(result.profile);
       return null;
     }
     await persist(result);
@@ -51,13 +57,14 @@ export function AuthProvider({ children }) {
       setBooting(false);
     })();
 
-    // Web-only: finishes the Google OAuth redirect flow (native resolves
-    // immediately via the idToken path in googleAuthService instead).
+    // Web-only: finishes the Google/Facebook OAuth redirect flow (native
+    // resolves immediately inside loginWithGoogle/Facebook instead).
+    if (Platform.OS !== 'web') return undefined;
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
       if (event !== 'SIGNED_IN' || !session?.user) return;
       const profile = extractProfileFromSession(session);
       if (!profile) return;
-      upsertUserFromGoogle(profile).then(resolveGoogleUpsert).catch(() => {});
+      upsertUserFromSocial(profile).then(resolveSocialUpsert).catch(() => {});
     });
     return () => subscription.subscription.unsubscribe();
   }, []);
@@ -68,43 +75,44 @@ export function AuthProvider({ children }) {
     return u;
   };
 
-  const loginWithGoogle = async () => {
-    const profile = await signInWithGoogle();
+  const loginWithSocial = async (signIn) => {
+    const profile = await signIn();
     if (!profile) return null; // cancelled, or web redirect in progress
-    const result = await upsertUserFromGoogle(profile);
-    return resolveGoogleUpsert(result);
+    const result = await upsertUserFromSocial(profile);
+    return resolveSocialUpsert(result);
   };
+  const loginWithGoogle = () => loginWithSocial(signInWithGoogle);
+  const loginWithFacebook = () => loginWithSocial(signInWithFacebook);
 
-  // Picker: "this is me" — link the pending Google identity onto an
-  // existing (unlinked) users row instead of creating a duplicate.
+  // Picker: "this is me" — link the pending identity onto an existing
+  // (unlinked for that provider) users row instead of creating a duplicate.
   const linkPendingTo = async (existingUserId) => {
-    if (!pendingGoogleProfile) return null;
-    const { authUserId, avatarUrl } = pendingGoogleProfile;
-    const u = await linkGoogleAccount(existingUserId, { authUserId, avatarUrl });
-    setPendingGoogleProfile(null);
+    if (!pendingProfile) return null;
+    const u = await linkSocialAccount(existingUserId, pendingProfile);
+    setPendingProfile(null);
     await persist(u);
     return u;
   };
 
   // Picker: "нов съм" — genuinely new person, create their row with the
-  // Google identity already linked.
+  // identity already linked.
   const createNewFromPending = async () => {
-    if (!pendingGoogleProfile) return null;
-    const u = await createGoogleUser(pendingGoogleProfile);
-    setPendingGoogleProfile(null);
+    if (!pendingProfile) return null;
+    const u = await createSocialUser(pendingProfile);
+    setPendingProfile(null);
     await persist(u);
     return u;
   };
 
   const cancelPendingLink = async () => {
-    setPendingGoogleProfile(null);
-    await signOutGoogle().catch(() => {});
+    setPendingProfile(null);
+    await signOutSocial().catch(() => {});
   };
 
   const logout = async () => {
     setUser(null);
     await AsyncStorage.removeItem(STORAGE_KEY);
-    await signOutGoogle().catch(() => {});
+    await signOutSocial().catch(() => {});
   };
 
   return (
@@ -114,8 +122,9 @@ export function AuthProvider({ children }) {
         booting,
         login,
         loginWithGoogle,
+        loginWithFacebook,
         logout,
-        pendingGoogleProfile,
+        pendingProfile,
         linkPendingTo,
         createNewFromPending,
         cancelPendingLink,

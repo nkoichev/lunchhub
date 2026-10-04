@@ -99,6 +99,20 @@ Without this, the "Продължи с Google" button on the login screen shows 
 clear error instead of crashing — everything else in the app works
 unaffected.
 
+### 5. Facebook sign-in (optional)
+
+Works the same way as Google — the first login is matched to an existing
+person by name, or the "which of these is you?" picker is shown.
+
+1. **Supabase SQL Editor** → run [`supabase/migration_facebook_auth_link.sql`](supabase/migration_facebook_auth_link.sql) once.
+2. **Meta for Developers** ([developers.facebook.com](https://developers.facebook.com)) → create an app (use case: *Authenticate and request data from users with Facebook Login*):
+   - Facebook Login → Settings → **Valid OAuth Redirect URIs**: `https://<your-project>.supabase.co/auth/v1/callback`
+   - Use cases → Facebook Login → Permissions: make sure **email** and **public_profile** are added.
+   - App settings → Basic: copy the **App ID** and **App Secret**. While the app is in development mode, only people added under App roles can sign in — publish it (Live) for the whole team.
+3. **Supabase** → Authentication → Sign In / Providers → **Facebook** → paste App ID and App Secret, enable it.
+4. **Supabase** → Authentication → URL Configuration → **Redirect URLs** → add `lunchhub://auth-callback` (the Android app's return address; web uses its own origin).
+5. Rebuild (`eas build --profile preview --platform android`) — the in-app browser module (`expo-web-browser`) needs a new native build.
+
 ---
 
 ## 🌐 Run in a web browser

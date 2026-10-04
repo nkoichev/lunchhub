@@ -59,39 +59,60 @@ export async function loginWithName(rawName) {
   return toUser(created);
 }
 
-// "Login with Google": links (or creates) a users row for this Google
+// Each sign-in provider has its own identity column on users, so the same
+// person can link both a Google and a Facebook account to one row.
+const PROVIDER_COLUMNS = {
+  google: 'auth_user_id',
+  facebook: 'facebook_auth_user_id',
+};
+const PROVIDER_LABELS = { google: 'Google', facebook: 'Facebook' };
+
+function columnFor(provider) {
+  const col = PROVIDER_COLUMNS[provider];
+  if (!col) throw new Error(`Непознат доставчик за вход: ${provider}`);
+  return col;
+}
+
+// "Login with Google/Facebook": links (or creates) a users row for this
 // identity. Matching priority:
-//   1. auth_user_id — Supabase Auth's id for this exact Google identity.
-//      Stable forever, so once a row is linked this is an exact match with
-//      no name-guessing, working across any later name/photo/script change.
-//   2. name (case-insensitive) — convenience for the *first* Google login,
-//      when the Google profile's name happens to spell the same as an
-//      existing name-only row. Only claims a row that isn't already linked
-//      to a different Google identity.
+//   1. auth user id — Supabase Auth's id for this exact identity, in any
+//      provider's column (Supabase merges Google + Facebook sharing a
+//      verified email into one auth user, so a Facebook login can land on a
+//      row already linked via Google). Stable forever, so once a row is
+//      linked this is an exact match with no name-guessing, working across
+//      any later name/photo/script change.
+//   2. name (case-insensitive) — convenience for the *first* login with a
+//      provider, when the profile's name happens to spell the same as an
+//      existing row. Only claims a row that isn't already linked to a
+//      different identity of that same provider.
 //   3. neither matches — this could be a genuinely new person, or the same
 //      person under a name that doesn't match (e.g. a Cyrillic name-only
-//      account vs. a Latin-script Google profile). Instead of guessing
-//      wrong and creating a duplicate, this returns { needsLink: true } so
-//      the UI can ask the person to pick themselves from the team list (see
-//      listUnlinkedUsers / linkGoogleAccount / createGoogleUser below).
+//      account vs. a Latin-script profile). Instead of guessing wrong and
+//      creating a duplicate, this returns { needsLink: true } so the UI can
+//      ask the person to pick themselves from the team list (see
+//      listUnlinkedUsers / linkSocialAccount / createSocialUser below).
 // Returns { id, name, avatarUrl } or { needsLink: true, profile }.
-export async function upsertUserFromGoogle({ name, avatarUrl, authUserId }) {
+export async function upsertUserFromSocial({ name, avatarUrl, authUserId, provider }) {
+  const col = columnFor(provider);
   const cleanName = (name || '').trim();
-  if (!cleanName) throw new Error('Google акаунтът няма име.');
+  if (!cleanName) throw new Error(`${PROVIDER_LABELS[provider]} акаунтът няма име.`);
 
   if (!isSupabaseConfigured) {
     return { id: `local-${cleanName.toLowerCase()}`, name: cleanName, avatarUrl: avatarUrl ?? null, local: true };
   }
 
   if (authUserId) {
+    const idFilter = Object.values(PROVIDER_COLUMNS).map((c) => `${c}.eq.${authUserId}`).join(',');
     const { data: linked, error: linkErr } = await supabase
       .from('users')
-      .select('id, name, avatar_url')
-      .eq('auth_user_id', authUserId)
+      .select(`id, name, avatar_url, ${col}`)
+      .or(idFilter)
+      .limit(1)
       .maybeSingle();
     if (linkErr) throw new Error(linkErr.message);
     if (linked) {
       const patch = {};
+      if (!linked[col]) patch[col] = authUserId;
       if (avatarUrl && linked.avatar_url !== avatarUrl) patch.avatar_url = avatarUrl;
       if (Object.keys(patch).length === 0) return toUser(linked);
       const { data: updated, error: updErr } = await supabase
@@ -107,13 +128,13 @@ export async function upsertUserFromGoogle({ name, avatarUrl, authUserId }) {
 
   const { data: existing, error: findErr } = await supabase
     .from('users')
-    .select('id, name, avatar_url, auth_user_id')
+    .select(`id, name, avatar_url, ${col}`)
     .ilike('name', cleanName)
     .maybeSingle();
   if (findErr) throw new Error(findErr.message);
 
-  if (existing && !existing.auth_user_id) {
-    const patch = { auth_user_id: authUserId ?? null };
+  if (existing && !existing[col]) {
+    const patch = { [col]: authUserId ?? null };
     if (avatarUrl && existing.avatar_url !== avatarUrl) patch.avatar_url = avatarUrl;
     const { data: updated, error: updErr } = await supabase
       .from('users')
@@ -125,28 +146,29 @@ export async function upsertUserFromGoogle({ name, avatarUrl, authUserId }) {
     return toUser(updated);
   }
 
-  return { needsLink: true, profile: { name: cleanName, avatarUrl: avatarUrl ?? null, authUserId } };
+  return { needsLink: true, profile: { name: cleanName, avatarUrl: avatarUrl ?? null, authUserId, provider } };
 }
 
-// Users with no Google identity linked yet — candidates for the "which of
-// these is you?" picker shown when upsertUserFromGoogle can't auto-match.
-export async function listUnlinkedUsers() {
+// Users with no identity of this provider linked yet — candidates for the
+// "which of these is you?" picker shown when upsertUserFromSocial can't
+// auto-match.
+export async function listUnlinkedUsers(provider) {
   if (!isSupabaseConfigured) return [];
   const { data, error } = await supabase
     .from('users')
     .select('id, name, avatar_url')
-    .is('auth_user_id', null)
+    .is(columnFor(provider), null)
     .order('name');
   if (error) throw new Error(error.message);
   return data.map((r) => ({ id: r.id, name: r.name, avatarUrl: r.avatar_url }));
 }
 
-// Picking "this is me" in that picker: link the Google identity onto an
-// existing row instead of creating a duplicate. Keeps the row's existing
-// name (order history, etc. was recorded under it) — only the identity link
-// and photo are added.
-export async function linkGoogleAccount(existingUserId, { authUserId, avatarUrl }) {
-  const patch = { auth_user_id: authUserId ?? null };
+// Picking "this is me" in that picker: link the identity onto an existing
+// row instead of creating a duplicate. Keeps the row's existing name (order
+// history, etc. was recorded under it) — only the identity link and photo
+// are added.
+export async function linkSocialAccount(existingUserId, { authUserId, avatarUrl, provider }) {
+  const patch = { [columnFor(provider)]: authUserId ?? null };
   if (avatarUrl) patch.avatar_url = avatarUrl;
   const { data, error } = await supabase
     .from('users')
@@ -159,12 +181,12 @@ export async function linkGoogleAccount(existingUserId, { authUserId, avatarUrl 
 }
 
 // Picking "нов съм" in that picker: a genuinely new person — create their
-// row with the Google identity already linked, so it's matched exactly on
-// every future login without ever needing the picker again.
-export async function createGoogleUser({ name, avatarUrl, authUserId }) {
+// row with the identity already linked, so it's matched exactly on every
+// future login without ever needing the picker again.
+export async function createSocialUser({ name, avatarUrl, authUserId, provider }) {
   const { data, error } = await supabase
     .from('users')
-    .insert({ name: (name || '').trim(), avatar_url: avatarUrl || null, auth_user_id: authUserId ?? null })
+    .insert({ name: (name || '').trim(), avatar_url: avatarUrl || null, [columnFor(provider)]: authUserId ?? null })
     .select('id, name, avatar_url')
     .single();
   if (error) throw new Error(error.message);

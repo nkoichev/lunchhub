@@ -25,7 +25,10 @@ create table if not exists public.users (
   -- Supabase Auth user id for a linked Google identity. Stable forever for
   -- that Google account, so once set it's how Google sign-in re-recognizes
   -- this person on every future login — no name matching needed.
-  auth_user_id uuid unique
+  auth_user_id uuid unique,
+  -- Same, for a linked Facebook identity (separate column so one person
+  -- can link both Google and Facebook).
+  facebook_auth_user_id uuid unique
 );
 
 -- ---------- RESTAURANTS ----------

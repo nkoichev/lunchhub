@@ -234,7 +234,7 @@ function RootNavigator() {
 }
 
 function Gate() {
-  const { user, booting, pendingGoogleProfile } = useAuth();
+  const { user, booting, pendingProfile } = useAuth();
   const { colors } = useTheme();
   const [pinVerified, setPinVerified] = useState(null); // null = still checking
 
@@ -270,7 +270,7 @@ function Gate() {
     <NavigationContainer>
       {user ? (
         <RootNavigator />
-      ) : pendingGoogleProfile ? (
+      ) : pendingProfile ? (
         <LinkAccountScreen />
       ) : (
         <LoginScreen />

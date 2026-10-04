@@ -16,12 +16,13 @@ import { spacing, radius, font } from '../theme/theme';
 import { isSupabaseConfigured } from '../config/supabase';
 
 export default function LoginScreen() {
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, loginWithFacebook } = useAuth();
   const { colors, shadow } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [facebookLoading, setFacebookLoading] = useState(false);
 
   const onSubmit = async () => {
     setLoading(true);
@@ -42,6 +43,17 @@ export default function LoginScreen() {
       alertMessage('Грешка', e.message);
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const onFacebookSubmit = async () => {
+    setFacebookLoading(true);
+    try {
+      await loginWithFacebook();
+    } catch (e) {
+      alertMessage('Грешка', e.message);
+    } finally {
+      setFacebookLoading(false);
     }
   };
 
@@ -92,6 +104,13 @@ export default function LoginScreen() {
             variant="ghost"
             onPress={onGoogleSubmit}
             loading={googleLoading}
+          />
+          <Button
+            title="Продължи с Facebook"
+            variant="ghost"
+            onPress={onFacebookSubmit}
+            loading={facebookLoading}
+            style={{ marginTop: spacing.sm }}
           />
         </View>
 
