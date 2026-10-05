@@ -15,6 +15,12 @@ import { alertMessage } from '../utils/confirm';
 import { spacing, radius, font } from '../theme/theme';
 import { isSupabaseConfigured } from '../config/supabase';
 
+// Hidden until the Meta app can go Live: Meta only publishes it after a
+// company-backed Business Verification, and while unpublished only people
+// added as app Testers can sign in. Everything behind it (SDK, Edge Function,
+// Supabase provider) stays set up — flip this to true to bring it back.
+const FACEBOOK_LOGIN_ENABLED = false;
+
 export default function LoginScreen() {
   const { login, loginWithGoogle, loginWithFacebook } = useAuth();
   const { colors, shadow } = useTheme();
@@ -105,13 +111,15 @@ export default function LoginScreen() {
             onPress={onGoogleSubmit}
             loading={googleLoading}
           />
-          <Button
-            title="Продължи с Facebook"
-            variant="ghost"
-            onPress={onFacebookSubmit}
-            loading={facebookLoading}
-            style={{ marginTop: spacing.sm }}
-          />
+          {FACEBOOK_LOGIN_ENABLED && (
+            <Button
+              title="Продължи с Facebook"
+              variant="ghost"
+              onPress={onFacebookSubmit}
+              loading={facebookLoading}
+              style={{ marginTop: spacing.sm }}
+            />
+          )}
         </View>
 
         {!isSupabaseConfigured && (
