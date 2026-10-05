@@ -5,11 +5,6 @@ import { firstNameOf } from '../utils/text';
 
 const webClientId = Constants.expoConfig?.extra?.googleWebClientId;
 
-// Where Supabase sends the native (Android/iOS) OAuth browser flow back to.
-// Must be listed under Supabase → Authentication → URL Configuration →
-// Redirect URLs (see README.md).
-const NATIVE_REDIRECT = 'lunchhub://auth-callback';
-
 // Which provider this session was just signed in with. Supabase links
 // identities that share a verified email onto one auth user, so
 // app_metadata.provider only says which one came *first* — the identity with
@@ -23,7 +18,9 @@ function currentProvider(user) {
   return latest.provider;
 }
 
-function extractProfile(user) {
+// `provider` overrides the session's own — the native Facebook flow ends in
+// a magic-link session (see signInWithFacebook), whose identity is 'email'.
+function extractProfile(user, provider = currentProvider(user)) {
   if (!user) return null;
   const meta = user.user_metadata || {};
   // Prefer the first name alone: name-only login asks for just a first name
@@ -42,7 +39,6 @@ function extractProfile(user) {
   // primary (script/spelling-independent) way upsertUserFromSocial
   // recognizes a returning sign-in.
   const authUserId = user.id;
-  const provider = currentProvider(user);
   return { name, avatarUrl, authUserId, provider };
 }
 
@@ -77,25 +73,40 @@ export async function signInWithGoogle() {
   return extractProfile(data.user);
 }
 
-// Facebook's Android SDK only hands out an access token (no OIDC idToken
-// like Google's), which Supabase can't verify directly — so native goes
-// through Supabase's OAuth flow too, just in an in-app browser tab that
-// redirects back to the app's lunchhub:// scheme instead of a web origin.
+// Native: the Facebook SDK signs in through the installed Facebook app (one
+// tap, like Google), but on Android it only hands out a plain access token —
+// no OIDC idToken that Supabase could verify itself. The facebook-login Edge
+// Function verifies it with Facebook instead and returns a one-time token
+// that's exchanged here for a normal Supabase session.
+// Web: Supabase's own OAuth redirect flow, same as Google.
 export async function signInWithFacebook() {
   if (Platform.OS === 'web') return signInWithWebRedirect('facebook');
 
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'facebook',
-    options: { redirectTo: NATIVE_REDIRECT, skipBrowserRedirect: true },
+  const { LoginManager, AccessToken, Settings } = require('react-native-fbsdk-next');
+  Settings.initializeSDK();
+  // Fresh start each time, so switching Facebook accounts works.
+  LoginManager.logOut();
+
+  const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
+  if (result.isCancelled) return null; // user closed the dialog — not an error
+
+  const token = await AccessToken.getCurrentAccessToken();
+  if (!token?.accessToken) throw new Error('Facebook не върна валиден вход.');
+
+  const { data, error } = await supabase.functions.invoke('facebook-login', {
+    body: { accessToken: token.accessToken },
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    const detail = await error.context?.json?.().catch(() => null);
+    throw new Error(detail?.error || error.message);
+  }
 
-  const WebBrowser = require('expo-web-browser');
-  const result = await WebBrowser.openAuthSessionAsync(data.url, NATIVE_REDIRECT);
-  if (result.type !== 'success') return null; // user closed the tab — not an error
-
-  const user = await sessionFromRedirect(result.url);
-  return extractProfile(user);
+  const { data: verified, error: otpErr } = await supabase.auth.verifyOtp({
+    token_hash: data.token_hash,
+    type: 'magiclink',
+  });
+  if (otpErr) throw new Error(otpErr.message);
+  return extractProfile(verified.user, 'facebook');
 }
 
 async function signInWithWebRedirect(provider) {
@@ -107,31 +118,6 @@ async function signInWithWebRedirect(provider) {
   return null; // the browser navigates away; session is picked up on return
 }
 
-// The redirect back carries either a PKCE ?code= or implicit-flow
-// #access_token=… depending on the client's flowType — handle both.
-async function sessionFromRedirect(url) {
-  const [beforeHash, hash = ''] = url.split('#');
-  const query = new URLSearchParams(beforeHash.split('?')[1] || '');
-  const fragment = new URLSearchParams(hash);
-
-  const errorDescription = query.get('error_description') || fragment.get('error_description');
-  if (errorDescription) throw new Error(errorDescription);
-
-  const code = query.get('code');
-  if (code) {
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) throw new Error(error.message);
-    return data.user;
-  }
-
-  const access_token = fragment.get('access_token');
-  const refresh_token = fragment.get('refresh_token');
-  if (!access_token || !refresh_token) throw new Error('Facebook не върна валиден вход.');
-  const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
-  if (error) throw new Error(error.message);
-  return data.user;
-}
-
 export async function signOutSocial() {
   if (Platform.OS !== 'web') {
     try {
@@ -139,6 +125,12 @@ export async function signOutSocial() {
       await GoogleSignin.signOut();
     } catch {
       // Best-effort — clearing our own local session below is what matters.
+    }
+    try {
+      const { LoginManager } = require('react-native-fbsdk-next');
+      LoginManager.logOut();
+    } catch {
+      // Same — best-effort.
     }
   }
   await supabase.auth.signOut();

@@ -33,7 +33,17 @@
         }
       ],
       "@react-native-google-signin/google-signin",
-      "expo-web-browser"
+      [
+        "react-native-fbsdk-next",
+        {
+          "appID": "952726931227767",
+          "clientToken": "65d9a9e0f7f7b12948ebbbc76aa5bd2c",
+          "displayName": "LunchHub",
+          "isAutoInitEnabled": false,
+          "autoLogAppEventsEnabled": false,
+          "advertiserIDCollectionEnabled": false
+        }
+      ]
     ],
     "android": {
       "package": "com.lunchhub.app",

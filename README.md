@@ -102,16 +102,24 @@ unaffected.
 ### 5. Facebook sign-in (optional)
 
 Works the same way as Google — the first login is matched to an existing
-person by name, or the "which of these is you?" picker is shown.
+person by name, or the "which of these is you?" picker is shown. On Android
+it signs in through the installed Facebook app (one tap); on web it uses
+Supabase's OAuth redirect.
 
 1. **Supabase SQL Editor** → run [`supabase/migration_facebook_auth_link.sql`](supabase/migration_facebook_auth_link.sql) once.
 2. **Meta for Developers** ([developers.facebook.com](https://developers.facebook.com)) → create an app (use case: *Authenticate and request data from users with Facebook Login*):
-   - Facebook Login → Settings → **Valid OAuth Redirect URIs**: `https://<your-project>.supabase.co/auth/v1/callback`
    - Use cases → Facebook Login → Permissions: make sure **email** and **public_profile** are added.
-   - App settings → Basic: copy the **App ID** and **App Secret**. While the app is in development mode, only people added under App roles can sign in — publish it (Live) for the whole team.
-3. **Supabase** → Authentication → Sign In / Providers → **Facebook** → paste App ID and App Secret, enable it.
-4. **Supabase** → Authentication → URL Configuration → **Redirect URLs** → add `lunchhub://auth-callback` (the Android app's return address; web uses its own origin).
-5. Rebuild (`eas build --profile preview --platform android`) — the in-app browser module (`expo-web-browser`) needs a new native build.
+   - Facebook Login → Settings → **Valid OAuth Redirect URIs**: `https://<your-project>.supabase.co/auth/v1/callback` (web login).
+   - App settings → Basic → **Add platform → Android**: package `com.lunchhub.app`, class `com.lunchhub.app.MainActivity`, and the **key hash** of the EAS signing key (base64 of its SHA-1 — `eas credentials -p android` shows the SHA-1).
+   - App settings → Basic: copy the **App ID** and **App Secret**; App settings → Advanced → Security: copy the **Client token**.
+   - Publish the app (Live) — in development mode only people under App roles can sign in.
+3. **Supabase** → Authentication → Sign In / Providers → **Facebook** → paste App ID and App Secret, enable it (web login).
+4. Native login goes through the [`facebook-login`](supabase/functions/facebook-login/index.ts) Edge Function, which verifies the Facebook token and returns a Supabase session:
+   ```sh
+   npx supabase secrets set FACEBOOK_APP_ID=<app id> FACEBOOK_APP_SECRET=<app secret>
+   npx supabase functions deploy facebook-login --no-verify-jwt
+   ```
+5. In [`app.json`](app.json), set `appID` and `clientToken` under the `react-native-fbsdk-next` plugin, then rebuild (`eas build --profile preview --platform android`).
 
 ---
 
