@@ -143,9 +143,10 @@ The same app can run in a browser (people enter orders from a desktop, no instal
    then press **w** to open it in the browser.
 3. Publish a shareable URL (free EAS Hosting):
    ```bash
-   npx expo export --platform web
-   npx eas deploy
+   npx expo export --platform web --clear
+   npx eas deploy --prod
    ```
+   Keep `--clear`: Metro's build cache is shared between Expo projects on the same machine, and without it a build can pick up another project's `app.json` (its Supabase URL and keys), so the site talks to the wrong database.
    EAS gives you a public link anyone can open.
 
 Notes: the layout is phone-shaped, so on a wide screen it appears as a centered narrow column (functional, not a bespoke desktop design). Confirmation dialogs use the browser's native confirm on web.
