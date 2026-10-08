@@ -114,7 +114,9 @@ export async function fetchSheetOrders() {
     if (!restaurantId) unmapped.add(restaurantRaw || '(празно)');
 
     const priceRaw = parseFloat(r[col.discPrice]) || parseFloat(r[col.price]) || 0;
-    const dateStr = parseSheetDate(r[r.length - 1]);
+    // The timestamp column has no header and isn't always last (a free-text
+    // comment column follows it), so take the first cell that parses as one.
+    const dateStr = r.map(parseSheetDate).find(Boolean) ?? null;
 
     rows.push({
       name,
