@@ -40,6 +40,12 @@ function formatUpdatedAt(iso) {
 // hasAutoImportedMenu below.
 const AUTO_IMPORTED_RESTAURANTS = new Set(['shtastlivetsa', 'lindo']);
 
+// Restaurants whose everyday dishes (day_index 0) are a separate "regular"
+// menu rather than part of each day's lunch menu: by default only the
+// day's lunch menu is shown, and a toggle switches to the regular one.
+// (Манджата / Малката Верея deliberately mix both into one list.)
+const SEPARATE_REGULAR_MENU = new Set(['lindo']);
+
 export default function MenuScreen({ navigation }) {
   const { qtyOf, add, decrement, count, total, clear, list } = useCart();
   const { restaurants, selected, setSelected } = useRestaurant();
@@ -57,6 +63,11 @@ export default function MenuScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [sortMode, setSortMode] = useState('alpha'); // 'alpha' | 'category'
   const [search, setSearch] = useState('');
+  const [menuMode, setMenuMode] = useState('lunch'); // 'lunch' | 'regular'
+  const hasRegularMenu = SEPARATE_REGULAR_MENU.has(selected?.id);
+
+  // Every restaurant opens on its lunch menu.
+  useEffect(() => setMenuMode('lunch'), [selected?.id]);
 
   // Switching restaurant with a non-empty cart would mix restaurants in one
   // order, so confirm and clear first.
@@ -100,11 +111,16 @@ export default function MenuScreen({ navigation }) {
   };
 
   // Search matches from the start of the dish name (not anywhere inside it).
+  const shownItems = useMemo(() => {
+    if (!hasRegularMenu) return items;
+    return items.filter((i) => (menuMode === 'regular' ? i.day_index === 0 : i.day_index !== 0));
+  }, [items, hasRegularMenu, menuMode]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLocaleLowerCase('bg');
-    if (!q) return items;
-    return items.filter((i) => i.name.toLocaleLowerCase('bg').startsWith(q));
-  }, [items, search]);
+    if (!q) return shownItems;
+    return shownItems.filter((i) => i.name.toLocaleLowerCase('bg').startsWith(q));
+  }, [shownItems, search]);
 
   const sections = useMemo(() => {
     if (sortMode === 'alpha') {
@@ -130,7 +146,7 @@ export default function MenuScreen({ navigation }) {
   // — showing it would just be noise (or a false stale warning).
   const hasAutoImportedMenu = AUTO_IMPORTED_RESTAURANTS.has(selected?.id);
   const lastUpdated = hasAutoImportedMenu
-    ? items.reduce((max, it) => (it.updated_at && (!max || it.updated_at > max) ? it.updated_at : max), null)
+    ? shownItems.reduce((max, it) => (it.updated_at && (!max || it.updated_at > max) ? it.updated_at : max), null)
     : null;
   // Only flagged as stale when browsing *today's* menu specifically — a
   // future/past weekday's rows are expected to carry an older timestamp,
@@ -225,6 +241,25 @@ export default function MenuScreen({ navigation }) {
             );
           })}
         </View>
+        {hasRegularMenu && (
+          <View style={[styles.menuModeBar, centered]}>
+            {[
+              { id: 'lunch', label: '🍽️ Обедно меню' },
+              { id: 'regular', label: '📋 Редовно меню' },
+            ].map((m) => {
+              const active = m.id === menuMode;
+              return (
+                <TouchableOpacity
+                  key={m.id}
+                  onPress={() => setMenuMode(m.id)}
+                  style={[styles.dayChip, active && styles.dayChipActive]}
+                >
+                  <Text style={[styles.dayChipText, active && styles.dayChipTextActive]}>{m.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
         {lastUpdated && (
           <Text style={[styles.updatedText, centered, isStale && styles.updatedTextStale]}>
             {isStale ? '⚠️ Може да не е обновено — ' : ''}Обновено {formatUpdatedAt(lastUpdated)}
@@ -271,11 +306,19 @@ export default function MenuScreen({ navigation }) {
             {sections.length === 0 ? (
               <EmptyState
                 emoji="📭"
-                title={search ? 'Няма съвпадения' : 'Няма меню за този ден'}
+                title={
+                  search
+                    ? 'Няма съвпадения'
+                    : hasRegularMenu && menuMode === 'lunch'
+                      ? 'Няма обедно меню за този ден'
+                      : 'Няма меню за този ден'
+                }
                 subtitle={
                   search
                     ? 'Опитайте с друго начало на името.'
-                    : 'Опитайте с друг ден или дръпнете надолу за обновяване.'
+                    : hasRegularMenu && menuMode === 'lunch'
+                      ? 'Ресторантът още не го е публикувал — вижте „Редовно меню“ или дръпнете надолу за обновяване.'
+                      : 'Опитайте с друг ден или дръпнете надолу за обновяване.'
                 }
               />
             ) : (
@@ -366,6 +409,11 @@ const makeStyles = (colors, scale = 1) => {
     borderRadius: 3,
     backgroundColor: colors.primary,
     marginTop: 3,
+  },
+  menuModeBar: {
+    flexDirection: 'row',
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
   },
   updatedText: {
     fontSize: font.xs,

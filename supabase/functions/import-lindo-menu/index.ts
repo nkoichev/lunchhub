@@ -226,16 +226,25 @@ Deno.serve(async (req: Request) => {
     const days = new Map<number, Dish[]>();
 
     const today = sofiaToday();
+    const todayIdx = dayIndexOf(today);
+    // Dates already in `days`, to prefer an upcoming date over a past one
+    // when both map to the same weekday (e.g. on Friday the page may show
+    // both this Monday and next Monday).
+    const chosenAhead = new Map<number, number>();
     for (const s of props.weeklySections ?? []) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(s.id)) continue;
-      // Only today and the days still ahead — never overwrite a past day
-      // with next week's menu, and leave past days as they were.
+      // The rest of this week (past days included — the site's "Само
+      // наличните днес" switch shows them too) plus the days still ahead.
       const ahead = daysBetween(today, s.id);
-      if (ahead < 0 || ahead > 6) continue;
+      if (ahead > 6 || ahead < -(todayIdx - 1)) continue;
       const idx = dayIndexOf(s.id);
       if (idx > 5) continue;
+      const prev = chosenAhead.get(idx);
+      if (prev !== undefined && prev >= 0 && ahead < 0) continue;
       const dishes = toDishes(s.lines, null);
-      if (dishes.length) days.set(idx, dishes);
+      if (!dishes.length) continue;
+      days.set(idx, dishes);
+      chosenAhead.set(idx, ahead);
     }
 
     const everyday: Dish[] = [];
@@ -286,7 +295,6 @@ Deno.serve(async (req: Request) => {
     let todayChanged = false;
     const now = new Date().toISOString();
 
-    const todayIdx = dayIndexOf(today);
     const sofiaDate = (iso: string) =>
       new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Sofia' }).format(new Date(iso));
 
