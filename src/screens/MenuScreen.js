@@ -35,6 +35,11 @@ function formatUpdatedAt(iso) {
   return `на ${date} в ${time}`;
 }
 
+// Restaurants whose menu is re-imported automatically every morning
+// (Щастливеца from its email, Lindo from lindo.bg) — see the comment at
+// hasAutoImportedMenu below.
+const AUTO_IMPORTED_RESTAURANTS = new Set(['shtastlivetsa', 'lindo']);
+
 export default function MenuScreen({ navigation }) {
   const { qtyOf, add, decrement, count, total, clear, list } = useCart();
   const { restaurants, selected, setSelected } = useRestaurant();
@@ -119,11 +124,11 @@ export default function MenuScreen({ navigation }) {
   // Freshest import timestamp among the currently shown items — the only
   // way to tell a live menu apart from stale leftover data (see the
   // Щастливеца incident where the daily Gmail→Gemini import silently
-  // failed and nobody could tell from the app). Only Щастливеца has that
-  // daily auto-import; every other restaurant's menu is entered once and
+  // failed and nobody could tell from the app). Only the auto-imported
+  // restaurants have that; every other restaurant's menu is entered once and
   // stays static on purpose, so "last updated" doesn't mean anything there
   // — showing it would just be noise (or a false stale warning).
-  const hasAutoImportedMenu = selected?.id === 'shtastlivetsa';
+  const hasAutoImportedMenu = AUTO_IMPORTED_RESTAURANTS.has(selected?.id);
   const lastUpdated = hasAutoImportedMenu
     ? items.reduce((max, it) => (it.updated_at && (!max || it.updated_at > max) ? it.updated_at : max), null)
     : null;

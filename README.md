@@ -52,6 +52,8 @@ The original app read from Google Sheets via an Apps Script — fragile, hard to
 
 **Adding more restaurants:** copy [`supabase/add_restaurant_template.sql`](supabase/add_restaurant_template.sql), fill in the restaurant name and its dishes, and run it. The new restaurant's button appears in the app automatically (pull to refresh). No rebuild needed.
 
+**Lindo (auto-imported from lindo.bg):** the [`import-lindo-menu`](supabase/functions/import-lindo-menu/index.ts) Edge Function reads https://lindo.bg/menu/daily — the weekly specials go to their weekdays, the everyday lunch menu to `day_index 0` (shown every day). [`supabase/migration_lindo.sql`](supabase/migration_lindo.sql) adds the restaurant and a `pg_cron` job (`lunchhub-import-lindo-menu`) that runs it every 30 min on weekday mornings, since Lindo publishes the specials day by day. Deploy with `npx supabase functions deploy import-lindo-menu`; it uses the same `GEMINI_API_KEY` secret for categories/calories of new dishes.
+
 ### 2. Connect the app
 1. In Supabase go to **Project Settings → API** and copy your **Project URL** and **anon public key**.
 2. Open [`app.json`](app.json) and replace the placeholders under `expo.extra`:
