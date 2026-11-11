@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchTodaySummary, deleteOrder, todayDateString } from '../services/orderService';
-import { fetchDayPayer, setDayPayer, markOrderPaid, fetchPayerCandidates } from '../services/paymentService';
+import { fetchDayPayer, setDayPayer, markOrderPaid, markForNamePaid, fetchPayerCandidates } from '../services/paymentService';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useDensity } from '../context/DensityContext';
@@ -152,13 +152,14 @@ export default function TodayScreen({ navigation }) {
 
   // What a card's owner owes the payer: the whole order minus any dishes
   // that were for the payer themself.
-  const owedToPayer = (p) => {
-    if (!payer) return p.total;
-    const payerKey = payer.name.trim().toLowerCase();
-    return p.items
-      .filter((it) => (it.forName || p.name).trim().toLowerCase() !== payerKey)
-      .reduce((s, it) => s + it.lineTotal, 0);
-  };
+  const isPayerName = (name) =>
+    !!payer && name.trim().toLowerCase() === payer.name.trim().toLowerCase();
+
+  // What the card's owner owes for their own dishes. Dishes ordered for
+  // colleagues are settled by each colleague separately (see the per-group
+  // pay rows), so they're not part of the owner's amount.
+  const ownerOwed = (p) =>
+    p.items.filter((it) => !it.forName).reduce((s, it) => s + it.lineTotal, 0);
 
   const onPickPayer = async (userId) => {
     const next = payerUserId === userId ? null : userId; // tap again to unset
@@ -181,11 +182,11 @@ export default function TodayScreen({ navigation }) {
     }
   };
 
-  const onPay = (p) => {
+  const onPay = (amount) => {
     if (!payer?.revolutTag) {
       alertMessage(
         'Няма Revolut таг',
-        `${payer?.name || 'Този човек'} няма Revolut таг — платете му ${owedToPayer(p).toFixed(2)} ${CURRENCY} по друг начин и отбележете „Платено“.`
+        `${payer?.name || 'Този човек'} няма Revolut таг — платете му ${amount.toFixed(2)} ${CURRENCY} по друг начин и отбележете „Платено“.`
       );
       return;
     }
@@ -211,6 +212,43 @@ export default function TodayScreen({ navigation }) {
       alertMessage('Грешка', e.message);
     }
   };
+
+  const onToggleForNamePaid = async (p, forName, paid) => {
+    try {
+      await markForNamePaid(p.orderId, forName, !paid);
+      setPeople((prev) =>
+        prev.map((x) =>
+          x.orderId === p.orderId
+            ? { ...x, items: x.items.map((it) => (it.forName === forName ? { ...it, isPaid: !paid } : it)) }
+            : x
+        )
+      );
+    } catch (e) {
+      alertMessage('Грешка', e.message);
+    }
+  };
+
+  // "Плати" + "Платено?" row, shared by the owner's own dishes and each
+  // colleague's group of dishes inside a card.
+  const renderPayRow = (amount, paid, onToggle) => (
+    <View style={styles.payRow}>
+      <TouchableOpacity style={styles.payBtn} onPress={() => onPay(amount)}>
+        <Text style={styles.payBtnText}>
+          {payer?.revolutTag
+            ? `💳 Плати ${amount.toFixed(2)} ${CURRENCY}`
+            : `💵 Дължи ${amount.toFixed(2)} ${CURRENCY} на ${payer?.name ?? '—'}`}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.paidToggle, paid && styles.paidToggleActive]}
+        onPress={onToggle}
+      >
+        <Text style={[styles.paidToggleText, paid && styles.paidToggleTextActive]}>
+          {paid ? '✅ Платено' : 'Платено?'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   if (loading) {
     return (
@@ -331,6 +369,25 @@ export default function TodayScreen({ navigation }) {
                           </Text>
                         </View>
                       ))}
+                      {showHeaders && g.forName === null && payerUserId && p.userId !== payerUserId && g.total > 0.004 && (
+                        <View style={{ marginLeft: 46 }}>
+                          {renderPayRow(g.total, p.isPaid, () => onTogglePaid(p))}
+                        </View>
+                      )}
+                      {payerUserId && g.forName !== null && (
+                        isPayerName(g.forName) ? (
+                          <View style={{ marginTop: spacing.xs, marginLeft: 46, alignSelf: 'flex-start' }}>
+                            <Badge label="💰 Получава плащанията" tone="primary" />
+                          </View>
+                        ) : (
+                          <View style={{ marginLeft: 46 }}>
+                            {(() => {
+                              const paid = g.items.every((it) => it.isPaid);
+                              return renderPayRow(g.total, paid, () => onToggleForNamePaid(p, g.forName, paid));
+                            })()}
+                          </View>
+                        )
+                      )}
                     </View>
                   ));
                 })()}
@@ -340,24 +397,11 @@ export default function TodayScreen({ navigation }) {
                     <Badge label="💰 Получава плащанията" tone="primary" />
                   </View>
                 )}
-                {payerUserId && p.userId !== payerUserId && owedToPayer(p) > 0.004 && (
-                  <View style={styles.payRow}>
-                    <TouchableOpacity style={styles.payBtn} onPress={() => onPay(p)}>
-                      <Text style={styles.payBtnText}>
-                        {payer?.revolutTag
-                          ? `💳 Плати ${owedToPayer(p).toFixed(2)} ${CURRENCY}`
-                          : `💵 Дължи ${owedToPayer(p).toFixed(2)} ${CURRENCY} на ${payer?.name ?? '—'}`}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.paidToggle, p.isPaid && styles.paidToggleActive]}
-                      onPress={() => onTogglePaid(p)}
-                    >
-                      <Text style={[styles.paidToggleText, p.isPaid && styles.paidToggleTextActive]}>
-                        {p.isPaid ? '✅ Платено' : 'Платено?'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                {payerUserId && p.userId !== payerUserId && ownerOwed(p) > 0.004 &&
+                  !p.items.some((it) => it.forName) && (
+                  // Plain card (no colleagues' dishes): owner's row at the bottom.
+                  // Otherwise it's rendered under the owner's own group above.
+                  renderPayRow(ownerOwed(p), p.isPaid, () => onTogglePaid(p))
                 )}
 
                 {isMe ? (

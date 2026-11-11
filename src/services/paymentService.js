@@ -69,3 +69,15 @@ export async function markOrderPaid(orderId, isPaid) {
   const { error } = await supabase.from('orders').update({ is_paid: isPaid }).eq('id', orderId);
   if (error) throw new Error(error.message);
 }
+
+// Mark one colleague's dishes within an order as settled (or not) — for
+// lines someone ordered on their behalf (order_items.for_name).
+export async function markForNamePaid(orderId, forName, isPaid) {
+  if (!isSupabaseConfigured) throw new Error('Базата данни не е настроена.');
+  const { error } = await supabase
+    .from('order_items')
+    .update({ is_paid: isPaid })
+    .eq('order_id', orderId)
+    .eq('for_name', forName);
+  if (error) throw new Error(error.message);
+}

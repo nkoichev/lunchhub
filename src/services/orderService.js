@@ -160,6 +160,15 @@ export async function updateOrder(orderId, items) {
 
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
+  // Keep colleagues' "paid" flags across the delete + reinsert below.
+  const { data: oldItems } = await supabase
+    .from('order_items')
+    .select('for_name, is_paid')
+    .eq('order_id', orderId);
+  const paidFor = new Set(
+    (oldItems || []).filter((it) => it.for_name && it.is_paid).map((it) => it.for_name)
+  );
+
   // Remove old lines, insert the new set, update the total.
   const { error: delErr } = await supabase
     .from('order_items')
@@ -174,6 +183,7 @@ export async function updateOrder(orderId, items) {
     quantity: i.quantity,
     line_total: i.price * i.quantity,
     for_name: i.forName ?? null,
+    is_paid: !!i.forName && paidFor.has(i.forName),
   }));
   const { error: insErr } = await supabase.from('order_items').insert(rows);
   if (insErr) throw new Error(insErr.message);
@@ -201,7 +211,7 @@ export async function fetchTodaySummary() {
   const [{ data, error }, { data: menuItems }] = await Promise.all([
     supabase
       .from('today_orders')
-      .select('client, user_id, avatar_url, total, item_name, quantity, line_total, order_id, restaurant_name, revolut_tag, is_paid, for_name'),
+      .select('client, user_id, avatar_url, total, item_name, quantity, line_total, order_id, restaurant_name, revolut_tag, is_paid, for_name, item_is_paid'),
     supabase.from('menu_items').select('name, calories').not('calories', 'is', null),
   ]);
   if (error) throw new Error(error.message);
@@ -238,6 +248,7 @@ export async function fetchTodaySummary() {
       quantity: row.quantity,
       lineTotal: Number(row.line_total),
       forName: row.for_name ?? null,
+      isPaid: !!row.item_is_paid,
     });
     map[key].total += Number(row.line_total);
     const calories = caloriesByName[row.item_name.trim().toLowerCase()];
