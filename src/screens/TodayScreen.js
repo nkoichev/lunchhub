@@ -168,10 +168,6 @@ export default function TodayScreen({ navigation }) {
         alertMessage('Няма профил', `${target.name} няма профил в приложението, затова не може да получава плащания тук.`);
         return;
       }
-      if (!target?.revolutTag) {
-        alertMessage('Няма Revolut таг', `${target?.name || 'Този човек'} още не си е задал Revolut таг в профила си.`);
-        return;
-      }
     }
     setPayerBusy(true);
     setPayerUserId(next);
@@ -187,7 +183,10 @@ export default function TodayScreen({ navigation }) {
 
   const onPay = (p) => {
     if (!payer?.revolutTag) {
-      alertMessage('Няма Revolut таг', 'Платецът още не си е задал Revolut таг.');
+      alertMessage(
+        'Няма Revolut таг',
+        `${payer?.name || 'Този човек'} няма Revolut таг — платете му ${owedToPayer(p).toFixed(2)} ${CURRENCY} по друг начин и отбележете „Платено“.`
+      );
       return;
     }
     // Revolut doesn't publicly document a URL format for pre-filling the
@@ -260,7 +259,7 @@ export default function TodayScreen({ navigation }) {
                     key={dp.userId}
                     disabled={payerBusy}
                     onPress={() => onPickPayer(dp.userId)}
-                    style={[styles.payerChip, active && styles.payerChipActive, noTag && styles.payerChipDisabled]}
+                    style={[styles.payerChip, active && styles.payerChipActive, noTag && styles.payerChipDisabled, noTag && active && styles.payerChipDisabledActive]}
                   >
                     <Avatar uri={dp.avatarUrl} name={dp.name} size={18} />
                     <Text style={[styles.payerChipText, active && styles.payerChipTextActive]}>
@@ -345,7 +344,9 @@ export default function TodayScreen({ navigation }) {
                   <View style={styles.payRow}>
                     <TouchableOpacity style={styles.payBtn} onPress={() => onPay(p)}>
                       <Text style={styles.payBtnText}>
-                        💳 Плати {owedToPayer(p).toFixed(2)} {CURRENCY}
+                        {payer?.revolutTag
+                          ? `💳 Плати ${owedToPayer(p).toFixed(2)} ${CURRENCY}`
+                          : `💵 Дължи ${owedToPayer(p).toFixed(2)} ${CURRENCY} на ${payer?.name ?? '—'}`}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -476,6 +477,9 @@ const makeStyles = (colors, scale = 1) => {
   },
   payerChipActive: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   payerChipDisabled: { opacity: 0.45 },
+  // No Revolut tag but picked: stays faded, with a strong outline so it's
+  // still obvious who's being paid today.
+  payerChipDisabledActive: { opacity: 0.7, borderColor: colors.primary, borderWidth: 2.5 },
   payerChipText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.textMuted },
   payerChipTextActive: { color: colors.primaryDark },
   payerHint: { fontSize: font.xs, color: colors.textFaint, marginTop: spacing.sm },
