@@ -272,7 +272,6 @@ export default function TodayScreen({ navigation }) {
   }
 
   const centered = { width: '100%', maxWidth, alignSelf: 'center' };
-  const cardBasis = columns >= 2 ? '48.5%' : '100%';
 
   return (
     <ScrollView
@@ -326,14 +325,14 @@ export default function TodayScreen({ navigation }) {
             )}
           </View>
 
-          <View style={styles.grid}>
-          {people.map((p) => {
+          {(() => {
+          const renderCard = (p) => {
             const isMe =
               user &&
               (p.userId === user.id ||
                 p.name.toLowerCase() === user.name.toLowerCase());
             return (
-              <View key={p.orderId} style={[styles.personCard, shadow.card, isMe && styles.myCard, { width: cardBasis }]}>
+              <View key={p.orderId} style={[styles.personCard, shadow.card, isMe && styles.myCard]}>
                 <View style={styles.personHeader}>
                   <Avatar uri={p.avatarUrl} name={p.name} size={34} />
                   <View style={{ flex: 1, marginLeft: spacing.md }}>
@@ -432,8 +431,32 @@ export default function TodayScreen({ navigation }) {
                 ) : null}
               </View>
             );
-          })}
-          </View>
+          };
+          if (columns < 2) return people.map(renderCard);
+          // Masonry: each card goes to the currently shortest column (by a
+          // rough height estimate), so cards keep their natural height
+          // instead of stretching to match a taller neighbour in a row.
+          const estimate = (p) => {
+            const groups = new Set(p.items.map((it) => it.forName ?? '__me__')).size;
+            const hasFor = p.items.some((it) => it.forName);
+            return 3 + p.items.length + (hasFor ? groups * 2 : 1) + (p.userId === user?.id ? 2 : 0);
+          };
+          const cols = Array.from({ length: Math.min(columns, 2) }, () => ({ h: 0, items: [] }));
+          people.forEach((p) => {
+            const target = cols.reduce((a, b) => (b.h < a.h ? b : a));
+            target.items.push(p);
+            target.h += estimate(p);
+          });
+          return (
+            <View style={styles.grid}>
+              {cols.map((c, i) => (
+                <View key={i} style={styles.gridCol}>
+                  {c.items.map(renderCard)}
+                </View>
+              ))}
+            </View>
+          );
+          })()}
 
           <View style={[styles.summaryCard, shadow.card]}>
             <Text style={styles.payerLabel}>📞 Поръчка</Text>
@@ -464,9 +487,10 @@ const makeStyles = (colors, scale = 1) => {
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   grid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: spacing.md,
   },
+  gridCol: { flex: 1, minWidth: 0 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   totalCard: {
     backgroundColor: colors.primary,
