@@ -12,6 +12,7 @@ import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
 import LogoSpinner from '../components/LogoSpinner';
+import { groupByForName } from '../utils/orderLines';
 
 export default function TodayScreen({ navigation }) {
   const { user } = useAuth();
@@ -84,7 +85,7 @@ export default function TodayScreen({ navigation }) {
           byRestaurant[rest][it.name] = { quantity: 0, names: new Set() };
         }
         byRestaurant[rest][it.name].quantity += it.quantity;
-        byRestaurant[rest][it.name].names.add(p.name);
+        byRestaurant[rest][it.name].names.add(it.forName || p.name);
       });
     });
     return Object.entries(byRestaurant)
@@ -253,17 +254,37 @@ export default function TodayScreen({ navigation }) {
                     )}
                   </View>
                 </View>
-                {p.items.map((it, idx) => (
-                  <View key={idx} style={styles.itemRow}>
-                    <Text style={styles.itemName}>
-                      {it.name}
-                      {it.quantity > 1 ? ` ×${it.quantity}` : ''}
-                    </Text>
-                    <Text style={styles.itemPrice}>
-                      {it.lineTotal.toFixed(2)} {CURRENCY}
-                    </Text>
-                  </View>
-                ))}
+                {(() => {
+                  // Dishes ordered for colleagues are grouped under their
+                  // name with a subtotal, so it's clear who owes what.
+                  const groups = groupByForName(p.items, (it) => it.lineTotal);
+                  const showHeaders = groups.some((g) => g.forName !== null);
+                  return groups.map((g) => (
+                    <View key={g.forName ?? ' me'}>
+                      {showHeaders && (
+                        <View style={styles.forHeader}>
+                          <Text style={styles.forHeaderName}>
+                            👤 {g.forName ?? p.name}
+                          </Text>
+                          <Text style={styles.forHeaderTotal}>
+                            {g.total.toFixed(2)} {CURRENCY}
+                          </Text>
+                        </View>
+                      )}
+                      {g.items.map((it, idx) => (
+                        <View key={idx} style={styles.itemRow}>
+                          <Text style={styles.itemName}>
+                            {it.name}
+                            {it.quantity > 1 ? ` ×${it.quantity}` : ''}
+                          </Text>
+                          <Text style={styles.itemPrice}>
+                            {it.lineTotal.toFixed(2)} {CURRENCY}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ));
+                })()}
 
                 {payerUserId && p.userId === payerUserId && (
                   <View style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}>
@@ -455,6 +476,18 @@ const makeStyles = (colors, scale = 1) => {
     paddingLeft: 46,
   },
   itemName: { fontSize: font.base, color: colors.textMuted, flex: 1 },
+  forHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: s(spacing.sm),
+    marginLeft: 46,
+    paddingTop: s(4),
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  forHeaderName: { fontSize: font.sm, fontWeight: font.bold, color: colors.primaryDark, flex: 1 },
+  forHeaderTotal: { fontSize: font.sm, fontWeight: font.bold, color: colors.textMuted },
   itemPrice: { fontSize: font.base, color: colors.textMuted },
   actions: {
     flexDirection: 'row',

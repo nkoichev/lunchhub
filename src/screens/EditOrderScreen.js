@@ -14,6 +14,9 @@ import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
 import LogoSpinner from '../components/LogoSpinner';
+import ForWhomModal from '../components/ForWhomModal';
+import { useAuth } from '../context/AuthContext';
+import { moveUnits } from '../utils/orderLines';
 
 export default function EditOrderScreen({ route, navigation }) {
   const { orderId } = route.params;
@@ -24,6 +27,9 @@ export default function EditOrderScreen({ route, navigation }) {
   const [restaurantName, setRestaurantName] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [ownerName, setOwnerName] = useState(null);
+  const [pickIndex, setPickIndex] = useState(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     (async () => {
@@ -35,9 +41,11 @@ export default function EditOrderScreen({ route, navigation }) {
               name: it.item_name,
               price: Number(it.price),
               quantity: it.quantity,
+              forName: it.for_name ?? null,
             }))
           );
           setRestaurantName(order.restaurant_name);
+          setOwnerName(order.owner_name);
         }
       } catch (e) {
         alertMessage('Грешка', e.message);
@@ -47,20 +55,20 @@ export default function EditOrderScreen({ route, navigation }) {
     })();
   }, [orderId]);
 
-  const inc = (name) =>
+  const inc = (index) =>
     setItems((prev) =>
-      prev.map((i) => (i.name === name ? { ...i, quantity: i.quantity + 1 } : i))
+      prev.map((i, n) => (n === index ? { ...i, quantity: i.quantity + 1 } : i))
     );
 
-  const dec = (name) =>
+  const dec = (index) =>
     setItems((prev) =>
       prev
-        .map((i) => (i.name === name ? { ...i, quantity: i.quantity - 1 } : i))
+        .map((i, n) => (n === index ? { ...i, quantity: i.quantity - 1 } : i))
         .filter((i) => i.quantity > 0)
     );
 
-  const removeItem = (name) =>
-    setItems((prev) => prev.filter((i) => i.name !== name));
+  const removeItem = (index) =>
+    setItems((prev) => prev.filter((_, n) => n !== index));
 
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
@@ -123,8 +131,8 @@ export default function EditOrderScreen({ route, navigation }) {
             subtitle="Ако запазите така, поръчката ще бъде изтрита."
           />
         ) : (
-          items.map((item) => (
-            <View key={item.name} style={[styles.row, shadow.card]}>
+          items.map((item, index) => (
+            <View key={`${item.name}|${item.forName ?? ''}`} style={[styles.row, shadow.card]}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.name}</Text>
                 <Text style={styles.unit}>
@@ -133,17 +141,25 @@ export default function EditOrderScreen({ route, navigation }) {
                     {(item.price * item.quantity).toFixed(2)} {CURRENCY}
                   </Text>
                 </Text>
+                <TouchableOpacity
+                  onPress={() => setPickIndex(index)}
+                  style={[styles.forChip, item.forName && styles.forChipActive]}
+                >
+                  <Text style={[styles.forChipText, item.forName && styles.forChipTextActive]}>
+                    👤 За: {item.forName ?? 'мен'} ▾
+                  </Text>
+                </TouchableOpacity>
               </View>
               <View style={styles.stepper}>
-                <TouchableOpacity style={styles.stepBtn} onPress={() => dec(item.name)}>
+                <TouchableOpacity style={styles.stepBtn} onPress={() => dec(index)}>
                   <Text style={styles.stepText}>−</Text>
                 </TouchableOpacity>
                 <Text style={styles.qty}>{item.quantity}</Text>
-                <TouchableOpacity style={styles.stepBtn} onPress={() => inc(item.name)}>
+                <TouchableOpacity style={styles.stepBtn} onPress={() => inc(index)}>
                   <Text style={styles.stepText}>+</Text>
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => removeItem(item.name)} hitSlop={8} style={styles.removeBtn}>
+              <TouchableOpacity onPress={() => removeItem(index)} hitSlop={8} style={styles.removeBtn}>
                 <Text style={styles.removeText}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -172,6 +188,17 @@ export default function EditOrderScreen({ route, navigation }) {
           />
         </View>
       </View>
+
+      <ForWhomModal
+        visible={pickIndex !== null}
+        line={pickIndex !== null ? items[pickIndex] : null}
+        ownerName={ownerName ?? user?.name}
+        onPick={(forName, qty) => {
+          setItems((prev) => moveUnits(prev, pickIndex, forName, qty));
+          setPickIndex(null);
+        }}
+        onClose={() => setPickIndex(null)}
+      />
     </View>
   );
 }
@@ -205,6 +232,19 @@ const makeStyles = (colors) => StyleSheet.create({
   name: { fontSize: font.md, fontWeight: font.semibold, color: colors.text },
   unit: { fontSize: font.sm, color: colors.textMuted, marginTop: 2 },
   lineTotal: { color: colors.accent, fontWeight: font.bold },
+  forChip: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  forChipActive: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  forChipText: { fontSize: font.xs, fontWeight: font.semibold, color: colors.textMuted },
+  forChipTextActive: { color: colors.primaryDark },
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',

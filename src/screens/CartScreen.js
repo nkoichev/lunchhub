@@ -6,18 +6,20 @@ import { useRestaurant } from '../context/RestaurantContext';
 import { useTheme } from '../context/ThemeContext';
 import { placeOrder } from '../services/orderService';
 import { Button, EmptyState } from '../components/ui';
+import ForWhomModal from '../components/ForWhomModal';
 import { alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
 
 export default function CartScreen({ navigation }) {
-  const { list, total, add, decrement, remove, clear, count } = useCart();
+  const { list, total, incLine, decLine, removeLine, assignLine, clear, count } = useCart();
   const { user } = useAuth();
   const { selected } = useRestaurant();
   const { colors, shadow } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { readWidth } = useResponsive();
   const [placing, setPlacing] = useState(false);
+  const [pickIndex, setPickIndex] = useState(null);
 
   const submit = async () => {
     setPlacing(true);
@@ -58,8 +60,8 @@ export default function CartScreen({ navigation }) {
             <Text style={styles.restBannerName}>{selected.name}</Text>
           </View>
         ) : null}
-        {list.map((item) => (
-          <View key={item.name} style={[styles.row, shadow.card]}>
+        {list.map((item, index) => (
+          <View key={`${item.name}|${item.forName ?? ''}`} style={[styles.row, shadow.card]}>
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{item.name}</Text>
               <Text style={styles.unit}>
@@ -68,17 +70,25 @@ export default function CartScreen({ navigation }) {
                   {(item.price * item.quantity).toFixed(2)} {CURRENCY}
                 </Text>
               </Text>
+              <TouchableOpacity
+                onPress={() => setPickIndex(index)}
+                style={[styles.forChip, item.forName && styles.forChipActive]}
+              >
+                <Text style={[styles.forChipText, item.forName && styles.forChipTextActive]}>
+                  👤 За: {item.forName ?? 'мен'} ▾
+                </Text>
+              </TouchableOpacity>
             </View>
             <View style={styles.stepper}>
-              <TouchableOpacity style={styles.stepBtn} onPress={() => decrement(item.name)}>
+              <TouchableOpacity style={styles.stepBtn} onPress={() => decLine(index)}>
                 <Text style={styles.stepText}>−</Text>
               </TouchableOpacity>
               <Text style={styles.qty}>{item.quantity}</Text>
-              <TouchableOpacity style={styles.stepBtn} onPress={() => add(item)}>
+              <TouchableOpacity style={styles.stepBtn} onPress={() => incLine(index)}>
                 <Text style={styles.stepText}>+</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={() => remove(item.name)} hitSlop={8} style={styles.removeBtn}>
+            <TouchableOpacity onPress={() => removeLine(index)} hitSlop={8} style={styles.removeBtn}>
               <Text style={styles.removeText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -101,6 +111,17 @@ export default function CartScreen({ navigation }) {
           <Button title="Поръчай" onPress={submit} loading={placing} />
         </View>
       </View>
+
+      <ForWhomModal
+        visible={pickIndex !== null}
+        line={pickIndex !== null ? list[pickIndex] : null}
+        ownerName={user?.name}
+        onPick={(forName, qty) => {
+          assignLine(pickIndex, forName, qty);
+          setPickIndex(null);
+        }}
+        onClose={() => setPickIndex(null)}
+      />
     </View>
   );
 }
@@ -133,6 +154,19 @@ const makeStyles = (colors) => StyleSheet.create({
   name: { fontSize: font.md, fontWeight: font.semibold, color: colors.text },
   unit: { fontSize: font.sm, color: colors.textMuted, marginTop: 2 },
   lineTotal: { color: colors.accent, fontWeight: font.bold },
+  forChip: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  forChipActive: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  forChipText: { fontSize: font.xs, fontWeight: font.semibold, color: colors.textMuted },
+  forChipTextActive: { color: colors.primaryDark },
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
