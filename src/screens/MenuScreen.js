@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -89,14 +89,24 @@ export default function MenuScreen({ navigation }) {
     }
   };
 
+  // Switching restaurant/day quickly (or the saved restaurant being
+  // restored on startup) can leave an older fetch still in flight; if it
+  // resolves last it would show another restaurant's dishes (and its
+  // "last updated" date) under the newly selected one. Only the latest
+  // request is allowed to update the screen.
+  const requestSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++requestSeq.current;
     try {
-      setItems(await fetchMenu(selected?.id, day));
+      const data = await fetchMenu(selected?.id, day);
+      if (seq === requestSeq.current) setItems(data);
     } catch (e) {
-      setItems([]);
+      if (seq === requestSeq.current) setItems([]);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (seq === requestSeq.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [day, selected?.id]);
 
