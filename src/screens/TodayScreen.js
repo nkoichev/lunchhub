@@ -230,25 +230,38 @@ export default function TodayScreen({ navigation }) {
 
   // "Плати" + "Платено?" row, shared by the owner's own dishes and each
   // colleague's group of dishes inside a card.
-  const renderPayRow = (amount, paid, onToggle) => (
-    <View style={styles.payRow}>
-      <TouchableOpacity style={styles.payBtn} onPress={() => onPay(amount)}>
-        <Text style={styles.payBtnText}>
-          {payer?.revolutTag
-            ? `💳 Плати ${amount.toFixed(2)} ${CURRENCY}`
-            : `💵 Дължи ${amount.toFixed(2)} ${CURRENCY} на ${payer?.name ?? '—'}`}
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.paidToggle, paid && styles.paidToggleActive]}
-        onPress={onToggle}
-      >
-        <Text style={[styles.paidToggleText, paid && styles.paidToggleTextActive]}>
-          {paid ? '✅ Платено' : 'Платено?'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+  // One compact line: what's owed on the left, a checkbox-style toggle on
+  // the right. Once paid, the left side collapses to a quiet confirmation.
+  const renderPayRow = (amount, paid, onToggle) => {
+    const amt = `${amount.toFixed(2)} ${CURRENCY}`;
+    return (
+      <View style={styles.payRow}>
+        {paid ? (
+          <Text style={styles.payDoneText} numberOfLines={1}>
+            Платено на {payer?.name ?? '—'}
+          </Text>
+        ) : payer?.revolutTag ? (
+          <TouchableOpacity style={styles.payBtn} onPress={() => onPay(amount)}>
+            <Text style={styles.payBtnText} numberOfLines={1}>💳 Плати {amt}</Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.oweText} numberOfLines={2}>
+            Дължи <Text style={styles.oweAmount}>{amt}</Text> на {payer?.name ?? '—'}
+          </Text>
+        )}
+        <TouchableOpacity
+          style={[styles.paidToggle, paid && styles.paidToggleActive]}
+          onPress={onToggle}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <View style={[styles.checkbox, paid && styles.checkboxActive]}>
+            {paid && <Text style={styles.checkmark}>✓</Text>}
+          </View>
+          <Text style={[styles.paidToggleText, paid && styles.paidToggleTextActive]}>Платено</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   if (loading) {
     return (
@@ -529,28 +542,50 @@ const makeStyles = (colors, scale = 1) => {
   payerHint: { fontSize: font.xs, color: colors.textFaint, marginTop: spacing.sm },
   payRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.sm,
-    marginTop: spacing.sm,
+    marginTop: s(6),
+    marginBottom: s(2),
+    paddingVertical: s(6),
+    paddingHorizontal: s(10),
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
   },
   payBtn: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 9,
-    borderRadius: radius.sm,
+    flexShrink: 1,
+    paddingVertical: s(6),
+    paddingHorizontal: s(14),
+    borderRadius: radius.pill,
     backgroundColor: colors.primary,
   },
   payBtnText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.onPrimary },
+  oweText: { flex: 1, fontSize: font.sm, color: colors.textMuted },
+  oweAmount: { fontWeight: font.bold, color: colors.text },
+  payDoneText: { flex: 1, fontSize: font.sm, color: colors.textFaint },
   paidToggle: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 9,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceAlt,
+    gap: 6,
+    paddingVertical: s(5),
+    paddingHorizontal: s(10),
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  paidToggleActive: { backgroundColor: '#E4F4EE', borderColor: colors.success },
+  paidToggleActive: { borderColor: colors.success },
+  checkbox: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: colors.textFaint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxActive: { backgroundColor: colors.success, borderColor: colors.success },
+  checkmark: { color: '#fff', fontSize: 11, fontWeight: font.bold, lineHeight: 13 },
   paidToggleText: { fontSize: font.sm, fontWeight: font.semibold, color: colors.textMuted },
   paidToggleTextActive: { color: colors.success },
   personCard: {
