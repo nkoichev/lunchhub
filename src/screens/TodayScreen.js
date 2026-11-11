@@ -103,7 +103,12 @@ export default function TodayScreen({ navigation }) {
   }, [people]);
 
   // Distinct people (a person may have >1 order today).
-  const peopleCount = new Set(people.map((p) => p.userId)).size;
+  // Headcount counts colleagues someone ordered for, not just accounts.
+  const peopleCount = new Set(
+    people.flatMap((p) =>
+      p.items.map((it) => (it.forName || p.name).trim().toLowerCase())
+    )
+  ).size;
   const distinctPeople = Object.values(
     people.reduce((acc, p) => {
       if (!acc[p.userId]) {
@@ -260,7 +265,7 @@ export default function TodayScreen({ navigation }) {
                   const groups = groupByForName(p.items, (it) => it.lineTotal);
                   const showHeaders = groups.some((g) => g.forName !== null);
                   return groups.map((g) => (
-                    <View key={g.forName ?? ' me'}>
+                    <View key={g.forName ?? '__me__'}>
                       {showHeaders && (
                         <View style={styles.forHeader}>
                           <Text style={styles.forHeaderName}>

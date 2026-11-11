@@ -271,39 +271,65 @@ export async function fetchColleagueNames() {
   return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }
 
-// A user's full order history, newest first.
+// A user's full order history, newest first — the dishes they actually
+// ate: their own orders minus lines ordered for colleagues, plus lines a
+// colleague ordered for them (for_name = their name).
 export async function fetchHistory(user) {
   if (!isSupabaseConfigured) return [];
 
-  const { data: orders, error } = await supabase
-    .from('orders')
-    .select('id, order_date, total, restaurant_id, restaurant_name, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(60);
+  const [{ data: orders, error }, { data: forMe }] = await Promise.all([
+    supabase
+      .from('orders')
+      .select('id, order_date, total, restaurant_id, restaurant_name, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(60),
+    supabase
+      .from('order_items')
+      .select(
+        'order_id, item_name, quantity, line_total, orders!inner(id, order_date, restaurant_id, restaurant_name, created_at)'
+      )
+      .ilike('for_name', user.name)
+      .limit(500),
+  ]);
   if (error) throw new Error(error.message);
-  if (!orders?.length) return [];
-
-  const ids = orders.map((o) => o.id);
-  const { data: items } = await supabase
-    .from('order_items')
-    .select('order_id, item_name, quantity, line_total')
-    .in('order_id', ids);
 
   const byOrder = {};
-  (items || []).forEach((it) => {
-    (byOrder[it.order_id] ??= []).push(it);
+  if (orders?.length) {
+    const { data: items } = await supabase
+      .from('order_items')
+      .select('order_id, item_name, quantity, line_total, for_name')
+      .in('order_id', orders.map((o) => o.id));
+    (items || [])
+      .filter((it) => !it.for_name)
+      .forEach((it) => {
+        (byOrder[it.order_id] ??= []).push(it);
+      });
+  }
+  const own = (orders || [])
+    .map((o) => ({ ...o, items: byOrder[o.id] ?? [] }))
+    .filter((o) => o.items.length);
+
+  const proxied = {};
+  (forMe || []).forEach(({ orders: o, ...it }) => {
+    (proxied[o.id] ??= { ...o, total: 0, items: [] }).items.push(it);
+    proxied[o.id].total += Number(it.line_total);
   });
 
-  return orders.map((o) => ({
-    ...o,
-    items: byOrder[o.id] ?? [],
-  }));
+  return [...own, ...Object.values(proxied)].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at)
+  );
 }
 
 // Everyone's full order history, newest first (for the shared History tab).
 // Fetched in pages because PostgREST caps each response (1000 rows by
 // default); items are embedded so no huge `in(order_id, ...)` list is needed.
+//
+// Each order is split into one entry per person who actually eats from it:
+// lines with a for_name become an entry for that colleague (as if they had
+// ordered themselves, so per-person stats stay real), carrying `orderedBy`
+// so the UI can note who placed it. `id` is unique per entry; `orderId` is
+// the real order (for edit/delete) and `ownerId` the account that placed it.
 const HISTORY_PAGE_SIZE = 1000;
 
 export async function fetchAllHistory() {
@@ -314,7 +340,7 @@ export async function fetchAllHistory() {
     const { data, error } = await supabase
       .from('orders')
       .select(
-        'id, order_date, total, restaurant_name, created_at, user_id, order_items(item_name, quantity, line_total)'
+        'id, order_date, total, restaurant_name, created_at, user_id, order_items(item_name, quantity, line_total, for_name)'
       )
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
@@ -325,27 +351,45 @@ export async function fetchAllHistory() {
   }
   if (!orders.length) return [];
 
-  const userIds = [...new Set(orders.map((o) => o.user_id))];
-  const { data: users } = await supabase
-    .from('users')
-    .select('id, name, avatar_url')
-    .in('id', userIds);
+  // All users (not just order owners): a for_name may match someone who
+  // has an account but never ordered on it themselves.
+  const { data: users } = await supabase.from('users').select('id, name, avatar_url');
 
-  const nameById = {};
-  const avatarById = {};
+  const byId = {};
+  const byLowerName = {};
   (users || []).forEach((u) => {
-    nameById[u.id] = u.name;
-    avatarById[u.id] = u.avatar_url ?? null;
+    byId[u.id] = u;
+    byLowerName[u.name.trim().toLowerCase()] = u;
   });
 
-  return orders.map((o) => ({
-    id: o.id,
-    date: o.order_date,
-    total: Number(o.total),
-    restaurantName: o.restaurant_name ?? '—',
-    userId: o.user_id,
-    userName: nameById[o.user_id] ?? '—',
-    userAvatar: avatarById[o.user_id] ?? null,
-    items: o.order_items ?? [],
-  }));
+  const entries = [];
+  orders.forEach((o) => {
+    const owner = byId[o.user_id];
+    const ownerName = owner?.name ?? '—';
+    const groups = new Map();
+    (o.order_items ?? []).forEach((it) => {
+      const forName = it.for_name?.trim() || null;
+      const key = forName ? forName.toLowerCase() : null;
+      if (!groups.has(key)) groups.set(key, { forName, items: [] });
+      groups.get(key).items.push(it);
+    });
+    groups.forEach(({ forName, items }, key) => {
+      const eater = key ? byLowerName[key] : owner;
+      const isProxy = key !== null && eater?.id !== o.user_id;
+      entries.push({
+        id: key === null ? o.id : `${o.id}:${key}`,
+        orderId: o.id,
+        ownerId: o.user_id,
+        orderedBy: isProxy ? ownerName : null,
+        date: o.order_date,
+        total: items.reduce((s, it) => s + Number(it.line_total), 0),
+        restaurantName: o.restaurant_name ?? '—',
+        userId: eater?.id ?? `name:${key}`,
+        userName: eater?.name ?? (forName || ownerName),
+        userAvatar: eater?.avatar_url ?? null,
+        items,
+      });
+    });
+  });
+  return entries;
 }
