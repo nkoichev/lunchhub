@@ -12,6 +12,17 @@ export async function updateRevolutTag(userId, tag) {
   return clean;
 }
 
+// Every app user with what the "На кого плащаме днес?" picker needs —
+// a colleague someone else ordered for may still be the one who paid.
+export async function fetchPayerCandidates() {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, name, avatar_url, revolut_tag');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 // Who is paying for everyone today (one payer per calendar day).
 export async function fetchDayPayer(dateString) {
   if (!isSupabaseConfigured) return null;

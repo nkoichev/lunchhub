@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchTodaySummary, deleteOrder, todayDateString } from '../services/orderService';
-import { fetchDayPayer, setDayPayer, markOrderPaid } from '../services/paymentService';
+import { fetchDayPayer, setDayPayer, markOrderPaid, fetchPayerCandidates } from '../services/paymentService';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useDensity } from '../context/DensityContext';
@@ -25,16 +25,19 @@ export default function TodayScreen({ navigation }) {
   const [grandTotal, setGrandTotal] = useState(0);
   const [payerUserId, setPayerUserId] = useState(null);
   const [payerBusy, setPayerBusy] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [{ people, grandTotal }, payer] = await Promise.all([
+      const [{ people, grandTotal }, payer, users] = await Promise.all([
         fetchTodaySummary(),
         fetchDayPayer(todayDateString()),
+        fetchPayerCandidates().catch(() => []),
       ]);
       setPeople(people);
+      setAllUsers(users);
       setGrandTotal(grandTotal);
       setPayerUserId(payer);
     } catch (_) {
@@ -109,20 +112,62 @@ export default function TodayScreen({ navigation }) {
       p.items.map((it) => (it.forName || p.name).trim().toLowerCase())
     )
   ).size;
-  const distinctPeople = Object.values(
-    people.reduce((acc, p) => {
-      if (!acc[p.userId]) {
-        acc[p.userId] = { userId: p.userId, name: p.name, avatarUrl: p.avatarUrl, revolutTag: p.revolutTag };
+  // Everyone who eats today — order owners plus colleagues ordered for
+  // (one of them may be the one who paid the restaurant). Names typed by
+  // hand are matched to an app account when possible; without an account
+  // they can't receive payments (no Revolut tag), so they show disabled.
+  const usersByLowerName = useMemo(() => {
+    const m = new Map();
+    allUsers.forEach((u) => m.set(u.name.trim().toLowerCase(), u));
+    return m;
+  }, [allUsers]);
+  const distinctPeople = useMemo(() => {
+    const acc = new Map();
+    people.forEach((p) => {
+      if (p.items.some((it) => !it.forName) && !acc.has(p.userId)) {
+        acc.set(p.userId, { userId: p.userId, name: p.name, avatarUrl: p.avatarUrl, revolutTag: p.revolutTag });
       }
-      return acc;
-    }, {})
-  );
-  const payer = people.find((p) => p.userId === payerUserId);
+      p.items.forEach((it) => {
+        if (!it.forName) return;
+        const key = it.forName.trim().toLowerCase();
+        const u = usersByLowerName.get(key);
+        const id = u ? u.id : `name:${key}`;
+        if (acc.has(id)) return;
+        acc.set(
+          id,
+          u
+            ? { userId: u.id, name: u.name, avatarUrl: u.avatar_url, revolutTag: u.revolut_tag }
+            : { userId: id, name: it.forName.trim(), avatarUrl: null, revolutTag: null, noAccount: true }
+        );
+      });
+    });
+    return [...acc.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [people, usersByLowerName]);
+  const payer =
+    distinctPeople.find((dp) => dp.userId === payerUserId) ||
+    (() => {
+      const u = allUsers.find((x) => x.id === payerUserId);
+      return u ? { userId: u.id, name: u.name, revolutTag: u.revolut_tag } : null;
+    })();
+
+  // What a card's owner owes the payer: the whole order minus any dishes
+  // that were for the payer themself.
+  const owedToPayer = (p) => {
+    if (!payer) return p.total;
+    const payerKey = payer.name.trim().toLowerCase();
+    return p.items
+      .filter((it) => (it.forName || p.name).trim().toLowerCase() !== payerKey)
+      .reduce((s, it) => s + it.lineTotal, 0);
+  };
 
   const onPickPayer = async (userId) => {
     const next = payerUserId === userId ? null : userId; // tap again to unset
     if (next) {
       const target = distinctPeople.find((dp) => dp.userId === next);
+      if (target?.noAccount) {
+        alertMessage('Няма профил', `${target.name} няма профил в приложението, затова не може да получава плащания тук.`);
+        return;
+      }
       if (!target?.revolutTag) {
         alertMessage('Няма Revolut таг', `${target?.name || 'Този човек'} още не си е задал Revolut таг в профила си.`);
         return;
@@ -205,11 +250,11 @@ export default function TodayScreen({ navigation }) {
           </View>
 
           <View style={[styles.payerCard, shadow.card]}>
-            <Text style={styles.payerLabel}>Кой плаща днес?</Text>
+            <Text style={styles.payerLabel}>На кого плащаме днес?</Text>
             <View style={styles.payerChips}>
               {distinctPeople.map((dp) => {
                 const active = dp.userId === payerUserId;
-                const noTag = !dp.revolutTag;
+                const noTag = !dp.revolutTag || dp.noAccount;
                 return (
                   <TouchableOpacity
                     key={dp.userId}
@@ -227,7 +272,7 @@ export default function TodayScreen({ navigation }) {
               })}
             </View>
             {!payerUserId && (
-              <Text style={styles.payerHint}>Изберете кой плаща сметката днес, за да се появят бутоните за плащане.</Text>
+              <Text style={styles.payerHint}>Изберете на кого плащаме днес (кой е платил сметката), за да се появят бутоните за плащане.</Text>
             )}
           </View>
 
@@ -293,14 +338,14 @@ export default function TodayScreen({ navigation }) {
 
                 {payerUserId && p.userId === payerUserId && (
                   <View style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}>
-                    <Badge label="💰 Плаща днес" tone="primary" />
+                    <Badge label="💰 Получава плащанията" tone="primary" />
                   </View>
                 )}
-                {payerUserId && p.userId !== payerUserId && (
+                {payerUserId && p.userId !== payerUserId && owedToPayer(p) > 0.004 && (
                   <View style={styles.payRow}>
                     <TouchableOpacity style={styles.payBtn} onPress={() => onPay(p)}>
                       <Text style={styles.payBtnText}>
-                        💳 Плати {p.total.toFixed(2)} {CURRENCY}
+                        💳 Плати {owedToPayer(p).toFixed(2)} {CURRENCY}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
