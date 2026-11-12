@@ -108,12 +108,10 @@ person by name, or the "which of these is you?" picker is shown. On Android
 it signs in through the installed Facebook app (one tap); on web it uses
 Supabase's OAuth redirect.
 
-> **Testers only.** Meta only lets the app go Live after a company-backed
-> Business Verification, so it stays in Development mode: add each colleague
-> under Meta for Developers → App roles → Roles → **Add People → Testers**
-> (max 50); they accept at developers.facebook.com/requests. Anyone not invited
-> gets a "само за поканени колеги" message. `FACEBOOK_LOGIN_ENABLED` in
-> [`LoginScreen.js`](src/screens/LoginScreen.js) hides the button again.
+> **Currently hidden** (`FACEBOOK_LOGIN_ENABLED` in [`LoginScreen.js`](src/screens/LoginScreen.js)):
+> Meta only lets the app go Live after a company-backed Business Verification,
+> and until then only people added as app Testers can sign in. The setup below
+> is complete — flip the flag to bring the button back.
 
 1. **Supabase SQL Editor** → run [`supabase/migration_facebook_auth_link.sql`](supabase/migration_facebook_auth_link.sql) once.
 2. **Meta for Developers** ([developers.facebook.com](https://developers.facebook.com)) → create an app (use case: *Authenticate and request data from users with Facebook Login*):
