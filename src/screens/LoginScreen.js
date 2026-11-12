@@ -15,11 +15,11 @@ import { alertMessage } from '../utils/confirm';
 import { spacing, radius, font } from '../theme/theme';
 import { isSupabaseConfigured } from '../config/supabase';
 
-// Hidden until the Meta app can go Live: Meta only publishes it after a
-// company-backed Business Verification, and while unpublished only people
-// added as app Testers can sign in. Everything behind it (SDK, Edge Function,
-// Supabase provider) stays set up — flip this to true to bring it back.
-const FACEBOOK_LOGIN_ENABLED = false;
+// The Meta app stays in Development mode (going Live needs a company-backed
+// Business Verification), so only people added as app Testers in Meta for
+// Developers → App roles can sign in with Facebook. Everyone else gets the
+// "not invited yet" message from signInWithFacebook.
+const FACEBOOK_LOGIN_ENABLED = true;
 
 export default function LoginScreen() {
   const { login, loginWithGoogle, loginWithFacebook } = useAuth();

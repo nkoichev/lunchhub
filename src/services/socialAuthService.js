@@ -79,6 +79,10 @@ export async function signInWithGoogle() {
 // Function verifies it with Facebook instead and returns a one-time token
 // that's exchanged here for a normal Supabase session.
 // Web: Supabase's own OAuth redirect flow, same as Google.
+const FACEBOOK_NOT_INVITED =
+  'Facebook входът е само за поканени колеги. Помоли администратора на LunchHub да те добави, ' +
+  'после приеми поканата на developers.facebook.com/requests и опитай пак.';
+
 export async function signInWithFacebook() {
   if (Platform.OS === 'web') return signInWithWebRedirect('facebook');
 
@@ -87,7 +91,18 @@ export async function signInWithFacebook() {
   // Fresh start each time, so switching Facebook accounts works.
   LoginManager.logOut();
 
-  const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
+  let result;
+  try {
+    result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
+  } catch (e) {
+    // The Meta app is in Development mode: anyone who isn't an accepted app
+    // Tester is turned away by Facebook ("App not active" / "not available").
+    throw new Error(
+      /not active|not available|not setup|not set up|developer|tester/i.test(e?.message || '')
+        ? FACEBOOK_NOT_INVITED
+        : e?.message || 'Facebook входът не успя.'
+    );
+  }
   if (result.isCancelled) return null; // user closed the dialog — not an error
 
   const token = await AccessToken.getCurrentAccessToken();
