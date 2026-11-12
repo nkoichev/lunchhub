@@ -7,7 +7,10 @@ import {
   TouchableOpacity,
   TextInput,
   RefreshControl,
+  Animated,
+  Easing,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCart } from '../context/CartContext';
 import { useRestaurant } from '../context/RestaurantContext';
 import { useTheme } from '../context/ThemeContext';
@@ -46,6 +49,11 @@ const AUTO_IMPORTED_RESTAURANTS = new Set(['shtastlivetsa', 'lindo']);
 // (Манджата / Малката Верея deliberately mix both into one list.)
 const SEPARATE_REGULAR_MENU = new Set(['lindo']);
 
+// The filters panel (restaurant / day / menu type / search) can be folded
+// away to leave more room for the dishes; the choice is remembered.
+const PANEL_KEY = 'lunchhub.menuPanelCollapsed';
+const PANEL_ANIM_MS = 320;
+
 export default function MenuScreen({ navigation }) {
   const { qtyOf, add, decrement, count, total, clear, list } = useCart();
   const { restaurants, selected, setSelected } = useRestaurant();
@@ -68,6 +76,50 @@ export default function MenuScreen({ navigation }) {
 
   // Every restaurant opens on its lunch menu.
   useEffect(() => setMenuMode('lunch'), [selected?.id]);
+
+  // Collapsible filters panel. Its natural height is measured from the inner
+  // content (which can change: the "regular menu" row, the "updated" line,
+  // a wrapping restaurant row), and the outer view's height is animated
+  // between 0 and that, together with a fade and a slight slide, so it
+  // folds away smoothly instead of jumping.
+  const [collapsed, setCollapsed] = useState(false);
+  const [panelHeight, setPanelHeight] = useState(0);
+  const panelAnim = useRef(new Animated.Value(1)).current; // 1 = open, 0 = folded
+  useEffect(() => {
+    AsyncStorage.getItem(PANEL_KEY)
+      .then((v) => {
+        if (v === '1') {
+          setCollapsed(true);
+          panelAnim.setValue(0);
+        }
+      })
+      .catch(() => {});
+  }, [panelAnim]);
+  const togglePanel = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    Animated.timing(panelAnim, {
+      toValue: next ? 0 : 1,
+      duration: PANEL_ANIM_MS,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: false, // height can't run on the native driver
+    }).start();
+    AsyncStorage.setItem(PANEL_KEY, next ? '1' : '0').catch(() => {});
+  };
+  const panelStyle = panelHeight
+    ? {
+        height: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [0, panelHeight] }),
+        opacity: panelAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0.4, 1] }),
+      }
+    : collapsed
+      ? { height: 0, opacity: 0 } // folded before the first measurement — don't flash it open
+      : null;
+  const panelInnerStyle = {
+    transform: [{ translateY: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
+  };
+  const chevronStyle = {
+    transform: [{ rotate: panelAnim.interpolate({ inputRange: [0, 1], outputRange: ['180deg', '0deg'] }) }],
+  };
 
   // Switching restaurant with a non-empty cart would mix restaurants in one
   // order, so confirm and clear first.
@@ -206,6 +258,14 @@ export default function MenuScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <Animated.View style={[styles.panel, panelStyle]} pointerEvents={collapsed ? 'none' : 'auto'}>
+      <Animated.View
+        style={panelInnerStyle}
+        onLayout={(e) => {
+          const h = Math.round(e.nativeEvent.layout.height);
+          if (h && h !== panelHeight) setPanelHeight(h);
+        }}
+      >
       {/* Restaurant selector */}
       {restaurants.length > 1 && (
         <View style={styles.barWrap}>
@@ -300,6 +360,27 @@ export default function MenuScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </View>
+      </Animated.View>
+      </Animated.View>
+
+      {/* Fold / unfold handle — when folded it also says what is shown */}
+      <TouchableOpacity style={styles.panelHandle} onPress={togglePanel} activeOpacity={0.7}>
+        <View style={[styles.panelHandleRow, centered]}>
+          <Text style={styles.panelHandleText} numberOfLines={1}>
+            {collapsed
+              ? [
+                  selected?.name,
+                  dayName(day),
+                  hasRegularMenu ? (menuMode === 'regular' ? 'Редовно меню' : 'Обедно меню') : null,
+                  search.trim() ? `„${search.trim()}“` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : 'Скрий'}
+          </Text>
+          <Animated.Text style={[styles.panelChevron, chevronStyle]}>▴</Animated.Text>
+        </View>
+      </TouchableOpacity>
 
       {loading ? (
         <View style={styles.center}>
@@ -370,6 +451,22 @@ const makeStyles = (colors, scale = 1) => {
   return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  panel: { overflow: 'hidden', backgroundColor: colors.surface },
+  panelHandle: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+  },
+  panelHandleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    gap: spacing.sm,
+  },
+  panelHandleText: { flexShrink: 1, fontSize: font.xs, fontWeight: font.semibold, color: colors.textFaint },
+  panelChevron: { fontSize: font.sm, color: colors.primary, fontWeight: font.bold },
   barWrap: {
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
