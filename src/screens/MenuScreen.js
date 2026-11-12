@@ -433,10 +433,10 @@ export default function MenuScreen({ navigation }) {
             onPress={() => navigation.navigate('Cart')}
           >
             <View style={styles.cartBadge}>
-              <Text style={styles.cartBadgeText}>{count}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.cartBadgeText}>{count}</Text>
             </View>
-            <Text style={styles.cartBarText}>Виж поръчката</Text>
-            <Text style={styles.cartBarTotal}>
+            <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.cartBarText}>Виж поръчката</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.cartBarTotal}>
               {total.toFixed(2)} {CURRENCY}
             </Text>
           </TouchableOpacity>

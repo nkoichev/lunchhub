@@ -87,7 +87,10 @@ function AnimatedTabBar({ state, descriptors, navigation, colors }) {
         backgroundColor: colors.surface,
         borderTopWidth: 1,
         borderTopColor: colors.border,
-        height: 62 + insets.bottom,
+        // minHeight, not height: with a large system font (Samsung's default
+        // is bigger than OnePlus') a fixed height let the icons/labels spill
+        // upwards over the screen, covering the floating "Виж поръчката" bar.
+        minHeight: 62 + insets.bottom,
         paddingTop: 6,
         paddingBottom: 8 + insets.bottom,
       }}
@@ -127,7 +130,7 @@ function AnimatedTabBar({ state, descriptors, navigation, colors }) {
             style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
           >
             <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{TAB_ICON[route.name]}</Text>
+              <Text maxFontSizeMultiplier={1.2} style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{TAB_ICON[route.name]}</Text>
               {badge ? (
                 <View
                   style={{
@@ -149,6 +152,7 @@ function AnimatedTabBar({ state, descriptors, navigation, colors }) {
             </View>
             <Text
               numberOfLines={1}
+              maxFontSizeMultiplier={1.3}
               style={{
                 fontSize: 11,
                 fontWeight: font.semibold,
