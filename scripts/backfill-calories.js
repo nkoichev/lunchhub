@@ -29,7 +29,7 @@ async function supabaseFetch(path, init) {
     headers: {
       'Content-Type': 'application/json',
       apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      ...(SUPABASE_ANON_KEY.startsWith('eyJ') ? { Authorization: `Bearer ${SUPABASE_ANON_KEY}` } : {}),
       ...(init?.headers || {}),
     },
   });
@@ -44,7 +44,7 @@ async function estimateCalories(name, category) {
     headers: {
       'Content-Type': 'application/json',
       apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      'x-import-secret': process.env.IMPORT_SECRET || '',
     },
     body: JSON.stringify({ name, category }),
   });

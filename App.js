@@ -5,7 +5,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -16,9 +15,7 @@ import { DensityProvider } from './src/context/DensityContext';
 import AppHeader from './src/components/AppHeader';
 import LogoSpinner from './src/components/LogoSpinner';
 
-import PinGateScreen from './src/screens/PinGateScreen';
 import LoginScreen from './src/screens/LoginScreen';
-import LinkAccountScreen from './src/screens/LinkAccountScreen';
 import MenuScreen from './src/screens/MenuScreen';
 import CartScreen from './src/screens/CartScreen';
 import TodayScreen from './src/screens/TodayScreen';
@@ -42,8 +39,6 @@ if (Platform.OS !== 'web') {
     }),
   });
 }
-
-const PIN_STORAGE_KEY = 'lunchhub.pinVerified';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -237,50 +232,21 @@ function RootNavigator() {
   );
 }
 
+// Only a real Supabase session whose email is on the LunchHub list gets in
+// (see AuthContext); everyone else sees the email-code / Google login.
 function Gate() {
-  const { user, booting, pendingProfile } = useAuth();
+  const { user, booting } = useAuth();
   const { colors } = useTheme();
-  const [pinVerified, setPinVerified] = useState(null); // null = still checking
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const v = await AsyncStorage.getItem(PIN_STORAGE_KEY);
-        setPinVerified(v === 'true');
-      } catch (_) {
-        setPinVerified(false);
-      }
-    })();
-  }, []);
+  if (booting) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
+        <LogoSpinner />
+      </View>
+    );
+  }
 
-  const onPinVerified = async () => {
-    try {
-      await AsyncStorage.setItem(PIN_STORAGE_KEY, 'true');
-    } catch (_) {}
-    setPinVerified(true);
-  };
-
-  const spinner = (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
-      <LogoSpinner />
-    </View>
-  );
-
-  if (pinVerified === null) return spinner;
-  if (!pinVerified) return <PinGateScreen onVerified={onPinVerified} />;
-  if (booting) return spinner;
-
-  return (
-    <NavigationContainer>
-      {user ? (
-        <RootNavigator />
-      ) : pendingProfile ? (
-        <LinkAccountScreen />
-      ) : (
-        <LoginScreen />
-      )}
-    </NavigationContainer>
-  );
+  return <NavigationContainer>{user ? <RootNavigator /> : <LoginScreen />}</NavigationContainer>;
 }
 
 function AppShell() {

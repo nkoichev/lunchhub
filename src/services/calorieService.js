@@ -1,4 +1,4 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, isSupabaseConfigured } from '../config/supabase';
+import { SUPABASE_URL, isSupabaseConfigured, functionHeaders } from '../config/supabase';
 
 // See supabase/functions/estimate-calories/index.ts — keeps the Gemini key
 // server-side instead of shipping it in the app bundle.
@@ -17,11 +17,7 @@ export async function estimateCalories(name, category) {
   try {
     const res = await fetch(ESTIMATE_CALORIES_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
+      headers: await functionHeaders(),
       body: JSON.stringify({ name, category }),
     });
     if (!res.ok) return null;

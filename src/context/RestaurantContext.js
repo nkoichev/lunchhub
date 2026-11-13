@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { fetchRestaurants } from '../services/restaurantService';
+import { useAuth } from './AuthContext';
 
 const RestaurantContext = createContext(null);
 
@@ -24,9 +25,11 @@ export function RestaurantProvider({ children }) {
     }
   };
 
+  // The tables answer only to a signed-in member, so (re)load on sign-in.
+  const { user } = useAuth();
   useEffect(() => {
-    load();
-  }, []);
+    if (user?.id) load();
+  }, [user?.id]);
 
   return (
     <RestaurantContext.Provider

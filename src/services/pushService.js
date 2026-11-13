@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { supabase, isSupabaseConfigured, SUPABASE_URL, SUPABASE_ANON_KEY } from '../config/supabase';
+import { supabase, isSupabaseConfigured, SUPABASE_URL, functionHeaders } from '../config/supabase';
 
 const PROJECT_ID = Constants.expoConfig?.extra?.eas?.projectId;
 
@@ -78,12 +78,7 @@ export async function notifyOrderPlaced(orderingUser, restaurantName, cart, tota
 
     await fetch(SEND_PUSH_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
+      headers: { ...(await functionHeaders()), Accept: 'application/json' },
       body: JSON.stringify(messages),
     });
   } catch (_) {

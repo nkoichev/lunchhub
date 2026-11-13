@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Pressable,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/ui';
-import { alertMessage } from '../utils/confirm';
 import { spacing, radius, font } from '../theme/theme';
 import { isSupabaseConfigured } from '../config/supabase';
 
@@ -22,46 +22,49 @@ import { isSupabaseConfigured } from '../config/supabase';
 const FACEBOOK_LOGIN_ENABLED = false;
 
 export default function LoginScreen() {
-  const { login, loginWithGoogle, loginWithFacebook } = useAuth();
+  const { sendEmailCode, verifyEmailCode, loginWithGoogle, loginWithFacebook, authError } = useAuth();
   const { colors, shadow } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [sentTo, setSentTo] = useState(null); // email the code went to → step 2
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [facebookLoading, setFacebookLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [resendIn, setResendIn] = useState(0);
 
-  const onSubmit = async () => {
-    setLoading(true);
+  useEffect(() => {
+    if (resendIn <= 0) return undefined;
+    const t = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
+
+  const run = async (setBusy, fn) => {
+    setBusy(true);
+    setError(null);
     try {
-      await login(name);
+      await fn();
     } catch (e) {
-      alertMessage('Грешка', e.message);
+      setError(e.message);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
-  const onGoogleSubmit = async () => {
-    setGoogleLoading(true);
-    try {
-      await loginWithGoogle();
-    } catch (e) {
-      alertMessage('Грешка', e.message);
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
+  const onSendCode = () =>
+    run(setLoading, async () => {
+      const to = await sendEmailCode(email);
+      setSentTo(to);
+      setCode('');
+      setResendIn(60);
+    });
 
-  const onFacebookSubmit = async () => {
-    setFacebookLoading(true);
-    try {
-      await loginWithFacebook();
-    } catch (e) {
-      alertMessage('Грешка', e.message);
-    } finally {
-      setFacebookLoading(false);
-    }
-  };
+  const onVerify = () => run(setLoading, () => verifyEmailCode(sentTo, code));
+  const onGoogleSubmit = () => run(setGoogleLoading, loginWithGoogle);
+  const onFacebookSubmit = () => run(setFacebookLoading, loginWithFacebook);
+  const digits = code.replace(/\D/g, '');
+  const shownError = error || authError;
 
   return (
     <KeyboardAvoidingView
@@ -76,28 +79,74 @@ export default function LoginScreen() {
         <Text style={styles.tagline}>Обедни поръчки за екипа</Text>
 
         <View style={[styles.formCard, shadow.card]}>
-          <Text style={styles.label}>Вашето име</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="напр. Иван"
-            placeholderTextColor={colors.textFaint}
-            style={styles.input}
-            autoFocus
-            returnKeyType="go"
-            onSubmitEditing={onSubmit}
-            maxLength={40}
-          />
-          <Button
-            title="Влизане"
-            onPress={onSubmit}
-            loading={loading}
-            disabled={name.trim().length < 2}
-            style={{ marginTop: spacing.lg }}
-          />
-          <Text style={styles.hint}>
-            Няма пароли — просто въведете името си, за да продължите.
-          </Text>
+          {!sentTo ? (
+            <>
+              <Text style={styles.label}>Служебен имейл</Text>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="ime@firma.bg"
+                placeholderTextColor={colors.textFaint}
+                style={styles.input}
+                autoFocus
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                autoComplete="email"
+                returnKeyType="send"
+                onSubmitEditing={onSendCode}
+                maxLength={120}
+              />
+              <Button
+                title="Изпрати код"
+                onPress={onSendCode}
+                loading={loading}
+                disabled={!email.includes('@')}
+                style={{ marginTop: spacing.lg }}
+              />
+              <Text style={styles.hint}>Ще получите код по имейл. Без пароли.</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.label}>Код от имейла</Text>
+              <Text style={styles.sentTo}>Изпратихме код на {sentTo}</Text>
+              <TextInput
+                value={code}
+                onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 8))}
+                placeholder="123456"
+                placeholderTextColor={colors.textFaint}
+                style={[styles.input, styles.codeInput]}
+                autoFocus
+                keyboardType="number-pad"
+                textContentType="oneTimeCode"
+                autoComplete="one-time-code"
+                returnKeyType="go"
+                onSubmitEditing={onVerify}
+                maxLength={8}
+              />
+              <Button
+                title="Влизане"
+                onPress={onVerify}
+                loading={loading}
+                disabled={digits.length < 6}
+                style={{ marginTop: spacing.lg }}
+              />
+              <View style={styles.row}>
+                <Pressable onPress={() => { setSentTo(null); setError(null); }}>
+                  <Text style={styles.link}>← Друг имейл</Text>
+                </Pressable>
+                <Pressable onPress={onSendCode} disabled={resendIn > 0 || loading}>
+                  <Text style={[styles.link, resendIn > 0 && styles.linkDisabled]}>
+                    {resendIn > 0 ? `Нов код след ${resendIn} с` : 'Изпрати нов код'}
+                  </Text>
+                </Pressable>
+              </View>
+              <Text style={styles.hint}>Не го виждате? Проверете и папка „Спам“.</Text>
+            </>
+          )}
+
+          {shownError ? <Text style={styles.error}>{shownError}</Text> : null}
 
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
@@ -125,8 +174,7 @@ export default function LoginScreen() {
         {!isSupabaseConfigured && (
           <View style={styles.warn}>
             <Text style={styles.warnText}>
-              ⚠️ Демо режим: базата данни не е настроена. Поръчките няма да се
-              запазват, докато не добавите Supabase ключове (вижте README).
+              ⚠️ Базата данни не е настроена (вижте README).
             </Text>
           </View>
         )}
@@ -200,6 +248,12 @@ const makeStyles = (colors) => StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.md,
   },
+  sentTo: { fontSize: font.sm, color: colors.textMuted, marginBottom: spacing.md },
+  codeInput: { fontSize: 24, letterSpacing: 6, textAlign: 'center', fontWeight: font.bold },
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md },
+  link: { fontSize: font.sm, color: colors.primary, fontWeight: font.semibold },
+  linkDisabled: { color: colors.textFaint },
+  error: { fontSize: font.sm, color: colors.danger, textAlign: 'center', marginTop: spacing.md },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
