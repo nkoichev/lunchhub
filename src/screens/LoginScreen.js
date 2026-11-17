@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/ui';
+import ApkDownloadCard from '../components/ApkDownloadCard';
 import { spacing, radius, font } from '../theme/theme';
 import { isSupabaseConfigured } from '../config/supabase';
 
@@ -170,6 +171,8 @@ export default function LoginScreen() {
             />
           )}
         </View>
+
+        <ApkDownloadCard />
 
         {!isSupabaseConfigured && (
           <View style={styles.warn}>
