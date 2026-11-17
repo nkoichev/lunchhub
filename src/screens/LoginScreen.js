@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/ui';
 import ApkDownloadCard from '../components/ApkDownloadCard';
+import LunchBackground from '../components/LunchBackground';
 import { spacing, radius, font } from '../theme/theme';
 import { isSupabaseConfigured } from '../config/supabase';
 
@@ -72,6 +73,7 @@ export default function LoginScreen() {
       style={{ flex: 1, backgroundColor: colors.bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <LunchBackground />
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.logoWrap}>
           <Text style={styles.logoEmoji}>🍲</Text>
