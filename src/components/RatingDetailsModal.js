@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image } from 'react-native';
+import Avatar from './Avatar';
 import { fetchRatersForDish, rateDish } from '../services/ratingService';
 import { alertMessage } from '../utils/confirm';
 import { StarRating, Badge } from './ui';
@@ -56,9 +57,9 @@ export default function RatingDetailsModal({ visible, itemName, restaurantId, us
         <View style={[styles.sheet, shadow.floating]}>
           <View style={styles.handle} />
           <Text style={styles.title}>{itemName}</Text>
-          <Text style={styles.subtitle}>Кой е гласувал за това ястие</Text>
+          <Text style={styles.subtitle}>Оценки и ревюта от колегите</Text>
 
-          <ScrollView style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled">
+          <ScrollView style={{ maxHeight: 460 }} keyboardShouldPersistTaps="handled">
             {loading ? (
               <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.xl }} />
             ) : raters.length === 0 ? (
@@ -67,8 +68,10 @@ export default function RatingDetailsModal({ visible, itemName, restaurantId, us
               raters.map((r) => {
                 const isMine = r.userId === user?.id;
                 return (
-                  <View key={r.userId} style={styles.row}>
-                    <View style={{ flex: 1 }}>
+                  <View key={r.userId} style={styles.rowWrap}>
+                  <View style={styles.row}>
+                    <Avatar uri={r.avatarUrl} name={r.name} size={30} />
+                    <View style={{ flex: 1, marginLeft: spacing.sm }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={styles.name}>{r.name}</Text>
                         {isMine && (
@@ -84,6 +87,9 @@ export default function RatingDetailsModal({ visible, itemName, restaurantId, us
                     ) : (
                       <StarRating value={r.stars} size={18} showValue />
                     )}
+                  </View>
+                  {r.comment ? <Text style={styles.comment}>„{r.comment}“</Text> : null}
+                  {r.photoUrl ? <Image source={{ uri: r.photoUrl }} style={styles.photo} /> : null}
                   </View>
                 );
               })
@@ -119,12 +125,23 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   title: { fontSize: font.lg, fontWeight: font.bold, color: colors.text },
   subtitle: { fontSize: font.sm, color: colors.textMuted, marginTop: 2, marginBottom: spacing.lg },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  rowWrap: {
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  comment: { fontSize: font.base, color: colors.text, marginTop: spacing.sm, marginLeft: 38, fontStyle: 'italic' },
+  photo: {
+    width: 220,
+    height: 165,
+    borderRadius: radius.md,
+    marginTop: spacing.sm,
+    marginLeft: 38,
+    backgroundColor: colors.surfaceAlt,
   },
   name: { fontSize: font.base, fontWeight: font.semibold, color: colors.text },
   date: { fontSize: font.xs, color: colors.textFaint, marginTop: 2 },

@@ -14,6 +14,8 @@ import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
 import LogoSpinner from '../components/LogoSpinner';
+import { tapHaptic, successHaptic } from '../utils/haptics';
+import { invalidateFunData } from '../services/funStatsService';
 
 export default function EditOrderScreen({ route, navigation }) {
   const { orderId } = route.params;
@@ -47,17 +49,21 @@ export default function EditOrderScreen({ route, navigation }) {
     })();
   }, [orderId]);
 
-  const inc = (name) =>
+  const inc = (name) => {
+    tapHaptic();
     setItems((prev) =>
       prev.map((i) => (i.name === name ? { ...i, quantity: i.quantity + 1 } : i))
     );
+  };
 
-  const dec = (name) =>
+  const dec = (name) => {
+    tapHaptic();
     setItems((prev) =>
       prev
         .map((i) => (i.name === name ? { ...i, quantity: i.quantity - 1 } : i))
         .filter((i) => i.quantity > 0)
     );
+  };
 
   const removeItem = (name) =>
     setItems((prev) => prev.filter((i) => i.name !== name));
@@ -68,6 +74,8 @@ export default function EditOrderScreen({ route, navigation }) {
     setSaving(true);
     try {
       const res = await updateOrder(orderId, items);
+      successHaptic();
+      invalidateFunData();
       alertMessage(
         res.deleted ? 'Изтрито' : 'Запазено',
         res.deleted ? 'Поръчката беше премахната.' : 'Поръчката е обновена.'

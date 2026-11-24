@@ -55,38 +55,77 @@ function summarizeCart(cart) {
   return parts.join(', ');
 }
 
-// Notify everyone else's devices that a new order was placed.
-export async function notifyOrderPlaced(orderingUser, restaurantName, cart, total) {
+// Relays a batch of Expo push messages through the send-push function.
+async function relay(messages) {
+  if (!messages.length) return;
+  await fetch(SEND_PUSH_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify(messages),
+  });
+}
+
+// Best-effort push to a set of users (or everyone but `exceptUserId` when
+// `userIds` is omitted). Never throws — a notification hiccup must not fail
+// whatever action triggered it.
+export async function pushTo({ userIds, exceptUserId, title, body, data }) {
   if (!isSupabaseConfigured) return;
   try {
-    const { data: tokens } = await supabase
-      .from('push_tokens')
-      .select('token, user_id')
-      .neq('user_id', orderingUser.id);
+    let q = supabase.from('push_tokens').select('token, user_id');
+    if (userIds) q = q.in('user_id', userIds);
+    if (exceptUserId) q = q.neq('user_id', exceptUserId);
+    const { data: tokens } = await q;
     if (!tokens?.length) return;
+    await relay(tokens.map((t) => ({ to: t.token, title, body, sound: 'default', data })));
+  } catch (_) {}
+}
 
-    const items = summarizeCart(cart);
-    const totalText = typeof total === 'number' ? ` — ${total.toFixed(2)} €` : '';
-    const body = `${orderingUser.name} поръча от ${restaurantName || 'менюто'}: ${items}${totalText}`;
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-    const messages = tokens.map((t) => ({
-      to: t.token,
-      title: '🍽️ Нова поръчка',
-      body,
-      sound: 'default',
-    }));
-
-    await fetch(SEND_PUSH_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify(messages),
-    });
-  } catch (_) {
-    // Best-effort — a failed notification must never block/fail the order.
+// A little variety so "new order" pushes don't all read the same.
+function orderTitle(cart) {
+  const qty = (cart || []).reduce((s, i) => s + (i.quantity || 1), 0);
+  const names = (cart || []).map((i) => i.name.toLowerCase()).join(' ');
+  if (/баклав|торт|десерт|палачинк|сладолед|тирамису|крем карамел/.test(names)) {
+    return pick(['🍰 Някой си угажда днес', '🍫 Сладко изкушение в поръчките']);
   }
+  if (qty >= 4) return pick(['👀 Някой е много гладен', '🐻 Апетит на мечка']);
+  return pick(['🍽️ Нова поръчка', '😋 Още един гладник', '🛎️ Поръчката тръгна', '🍲 Някой вече избра']);
+}
+
+// Notify everyone else's devices that a new order was placed.
+export async function notifyOrderPlaced(orderingUser, restaurantName, cart, total) {
+  const items = summarizeCart(cart);
+  const totalText = typeof total === 'number' ? ` — ${total.toFixed(2)} €` : '';
+  await pushTo({
+    exceptUserId: orderingUser.id,
+    title: orderTitle(cart),
+    body: `${orderingUser.name} току-що поръча от ${restaurantName || 'менюто'}: ${items}${totalText}`,
+    data: { screen: 'Today' },
+  });
+}
+
+// Roulette result — everyone gets told who's buying.
+export async function notifyRouletteWinner(spinner, winnerName) {
+  await pushTo({
+    title: `🎰 Рулетката реши: днес черпи ${winnerName}!`,
+    body: `${spinner.name} завъртя колелото. Сметката отива при ${winnerName} 💸`,
+    data: { screen: 'Today' },
+  });
+}
+
+// Someone reacted to your order.
+export async function notifyReaction(reactor, ownerUserId, emoji) {
+  if (!ownerUserId || ownerUserId === reactor.id) return;
+  await pushTo({
+    userIds: [ownerUserId],
+    title: `${emoji} ${reactor.name} реагира на поръчката ти`,
+    body: 'Виж какво мислят колегите за днешния ти избор.',
+    data: { screen: 'Today' },
+  });
 }

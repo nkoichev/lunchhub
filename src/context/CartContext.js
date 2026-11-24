@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
+import { tapHaptic } from '../utils/haptics';
 
 const CartContext = createContext(null);
 
@@ -6,7 +7,10 @@ export function CartProvider({ children }) {
   // items keyed by dish name: { name, price, quantity }
   const [items, setItems] = useState({});
 
+  // Every add/remove gives a light haptic tick — "picking" a dish should
+  // feel like something happened, wherever the +/− lives (menu, cart).
   const add = (dish) => {
+    tapHaptic();
     setItems((prev) => {
       const existing = prev[dish.name];
       return {
@@ -21,6 +25,7 @@ export function CartProvider({ children }) {
   };
 
   const decrement = (name) => {
+    tapHaptic();
     setItems((prev) => {
       const existing = prev[name];
       if (!existing) return prev;
@@ -43,6 +48,24 @@ export function CartProvider({ children }) {
 
   const clear = () => setItems({});
 
+  // Bulk add (e.g. "Вземи същото като…") — one haptic for the whole batch.
+  // dishes: [{ name, price, quantity }]
+  const addMany = (dishes) => {
+    tapHaptic();
+    setItems((prev) => {
+      const next = { ...prev };
+      dishes.forEach((d) => {
+        const existing = next[d.name];
+        next[d.name] = {
+          name: d.name,
+          price: d.price,
+          quantity: (existing?.quantity ?? 0) + (d.quantity || 1),
+        };
+      });
+      return next;
+    });
+  };
+
   const list = useMemo(() => Object.values(items), [items]);
   const count = useMemo(() => list.reduce((s, i) => s + i.quantity, 0), [list]);
   const total = useMemo(
@@ -53,7 +76,7 @@ export function CartProvider({ children }) {
 
   return (
     <CartContext.Provider
-      value={{ items, list, count, total, add, decrement, remove, clear, qtyOf }}
+      value={{ items, list, count, total, add, addMany, decrement, remove, clear, qtyOf }}
     >
       {children}
     </CartContext.Provider>

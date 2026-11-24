@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { tapHaptic } from '../utils/haptics';
 import { spacing, radius, font } from '../theme/theme';
 
 export default function ThemeModal({ visible, onClose }) {
@@ -22,7 +23,10 @@ export default function ThemeModal({ visible, onClose }) {
                 key={t.id}
                 style={[styles.row, active && styles.rowActive]}
                 activeOpacity={0.7}
-                onPress={() => setScheme(t.id)}
+                onPress={() => {
+                  tapHaptic();
+                  setScheme(t.id);
+                }}
               >
                 <View style={styles.swatches}>
                   <View style={[styles.dot, { backgroundColor: t.colors.primary }]} />
@@ -30,6 +34,7 @@ export default function ThemeModal({ visible, onClose }) {
                   <View style={[styles.dot, styles.dotBorder, { backgroundColor: t.colors.bg }]} />
                 </View>
                 <Text style={styles.name}>{t.name}</Text>
+                {t.effect === 'snow' && <Text style={styles.seasonal}>❄ сезонна</Text>}
                 {active && <Text style={styles.check}>✓</Text>}
               </TouchableOpacity>
             );
@@ -78,6 +83,7 @@ const makeStyles = (colors) =>
     dot: { width: 18, height: 18, borderRadius: 9, marginRight: -6 },
     dotBorder: { borderWidth: 1, borderColor: colors.border },
     name: { flex: 1, fontSize: font.base, fontWeight: font.semibold, color: colors.text, marginLeft: spacing.sm },
+    seasonal: { fontSize: font.xs, color: colors.textFaint, marginRight: spacing.sm },
     check: { fontSize: font.md, fontWeight: font.bold, color: colors.primary },
     close: { alignSelf: 'center', padding: spacing.md, marginTop: spacing.sm },
     closeText: { color: colors.textMuted, fontSize: font.base, fontWeight: font.semibold },

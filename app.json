@@ -43,6 +43,13 @@
           "autoLogAppEventsEnabled": false,
           "advertiserIDCollectionEnabled": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "LunchHub използва снимките ви, за да прикачите снимка към ревю на ястие.",
+          "cameraPermission": "LunchHub използва камерата, за да снимате ястието си за ревю."
+        }
       ]
     ],
     "android": {
