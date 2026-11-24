@@ -58,3 +58,15 @@ export async function fetchAllSteps(limit = 3000) {
     userAvatar: r.users?.avatar_url ?? null,
   }));
 }
+
+// One person's step count for a single day (0 if nothing synced yet).
+export async function fetchStepsForDay(user, dateString) {
+  if (!isSupabaseConfigured || !user) return 0;
+  const { data } = await supabase
+    .from('daily_steps')
+    .select('steps')
+    .eq('user_id', user.id)
+    .eq('step_date', dateString)
+    .maybeSingle();
+  return Number(data?.steps ?? 0);
+}

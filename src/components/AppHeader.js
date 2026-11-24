@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { confirmDialog } from '../utils/confirm';
@@ -21,6 +22,7 @@ export default function AppHeader() {
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [densityModalOpen, setDensityModalOpen] = useState(false);
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const navigation = useNavigation();
 
   const confirmLogout = () => {
     confirmDialog({
@@ -35,7 +37,13 @@ export default function AppHeader() {
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
       <View style={[styles.inner, { maxWidth, alignSelf: 'center', width: '100%' }]}>
-        <Avatar uri={user?.avatarUrl} name={user?.name} size={36} />
+        {/* Avatar → achievements (badges, streaks, Wrapped). */}
+        <TouchableOpacity onPress={() => navigation.navigate('Achievements')} hitSlop={6}>
+          <Avatar uri={user?.avatarUrl} name={user?.name} size={36} />
+          <View style={styles.medal}>
+            <Text style={styles.medalText}>🏅</Text>
+          </View>
+        </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: spacing.sm }}>
           {/* The greeting line doesn't fit next to the avatar + 4 header
               buttons on a phone-width screen — web has the room, native
@@ -81,6 +89,18 @@ const makeStyles = (colors) =>
       alignItems: 'flex-end',
     },
     greeting: { fontSize: font.lg, fontWeight: font.bold, color: colors.text },
+    medal: {
+      position: 'absolute',
+      right: -6,
+      bottom: -4,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    medalText: { fontSize: 11 },
     iconBtn: {
       width: 34,
       height: 34,

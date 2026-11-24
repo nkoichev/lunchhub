@@ -40,6 +40,35 @@ export const CURRENCY = '€';
 // Every palette shares the same keys so any screen can be themed just by
 // swapping which one is active — no per-screen color logic.
 const PALETTES = {
+  // Seasonal: Christmas colors on a deep winter-night background, with
+  // falling snow over the app (see components/Snowfall.js — any palette
+  // with `effect: 'snow'` gets it).
+  winter: {
+    name: 'Коледа 🎄',
+    effect: 'snow',
+    colors: {
+      primary: '#E5484D',
+      primaryDark: '#C2353A',
+      primaryLight: '#3A1F2A',
+      accent: '#4CC38A',
+      bg: '#0E1726',
+      surface: '#152238',
+      surfaceAlt: '#1A2942',
+      border: '#25385A',
+      text: '#F2F6FC',
+      textMuted: '#A9B8CF',
+      textFaint: '#7186A6',
+      onPrimary: '#FFFFFF',
+      success: '#4CC38A',
+      danger: '#FF6B6B',
+      warning: '#F5C451',
+      star: '#F5C451',
+      starEmpty: '#2B3D5E',
+      overlay: 'rgba(3,8,18,0.6)',
+      shadowColor: '#000000',
+      statusBar: 'light',
+    },
+  },
   warm: {
     name: 'Топла',
     colors: {
@@ -220,13 +249,14 @@ const PALETTES = {
 export const THEMES = Object.entries(PALETTES).map(([id, t]) => ({
   id,
   name: t.name,
+  effect: t.effect ?? null,
   colors: t.colors,
 }));
 
 export const DEFAULT_THEME_ID = 'iconDark';
 
 export function getTheme(id) {
-  return THEMES.find((t) => t.id === id) ?? THEMES[0];
+  return THEMES.find((t) => t.id === id) ?? THEMES.find((t) => t.id === DEFAULT_THEME_ID);
 }
 
 // Shadows depend on the palette's shadow tint (a near-black in light themes,

@@ -8,6 +8,9 @@ import { useRestaurant } from '../context/RestaurantContext';
 import { useTheme } from '../context/ThemeContext';
 import { StarRating, EmptyState, Badge } from '../components/ui';
 import RatingDetailsModal from '../components/RatingDetailsModal';
+import ReviewModal from '../components/ReviewModal';
+import { tapHaptic } from '../utils/haptics';
+import { invalidateFunData } from '../services/funStatsService';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font } from '../theme/theme';
 import LogoSpinner from '../components/LogoSpinner';
@@ -24,6 +27,7 @@ export default function RatingsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [detailsDish, setDetailsDish] = useState(null);
+  const [reviewDish, setReviewDish] = useState(null);
 
   const load = useCallback(async () => {
     if (!selected) {
@@ -73,10 +77,12 @@ export default function RatingsScreen() {
   );
 
   const onRate = async (dish, stars) => {
-    // Optimistic update
-    setMyRatings((prev) => ({ ...prev, [dish]: { stars } }));
+    tapHaptic();
+    // Optimistic update (keeps any written review/photo)
+    setMyRatings((prev) => ({ ...prev, [dish]: { ...prev[dish], stars } }));
     try {
       await rateDish(user, selected.id, dish, stars);
+      invalidateFunData();
       load();
     } catch (e) {
       Alert.alert('Грешка', e.message);
@@ -150,18 +156,28 @@ export default function RatingsScreen() {
         />
       ) : (
         dishes.map((dish) => {
-          const mine = myRatings[dish]?.stars ?? 0;
+          const mineFull = myRatings[dish];
+          const mine = mineFull?.stars ?? 0;
+          const hasReview = !!(mineFull?.comment || mineFull?.photoUrl);
           return (
             <View key={dish} style={[styles.rateCard, shadow.card]}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.dishName}>{dish}</Text>
                 {mine > 0 ? (
-                  <View style={{ marginTop: 4 }}>
+                  <View style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' }}>
                     <Badge label="Оценено от вас" tone="success" />
+                    <TouchableOpacity onPress={() => setReviewDish(dish)} hitSlop={6}>
+                      <Text style={styles.reviewLink}>{hasReview ? '✏️ Ревю' : '✍️ Напиши ревю'}</Text>
+                    </TouchableOpacity>
                   </View>
                 ) : (
                   <Text style={styles.tapHint}>Докоснете звездите</Text>
                 )}
+                {mineFull?.comment ? (
+                  <Text style={styles.myComment} numberOfLines={2}>
+                    „{mineFull.comment}“{mineFull.photoUrl ? '  📷' : ''}
+                  </Text>
+                ) : null}
               </View>
               <StarRating value={mine} size={26} onRate={(n) => onRate(dish, n)} />
             </View>
@@ -178,6 +194,18 @@ export default function RatingsScreen() {
       user={user}
       onClose={() => setDetailsDish(null)}
       onChanged={load}
+    />
+    <ReviewModal
+      visible={!!reviewDish}
+      user={user}
+      restaurantId={selected?.id}
+      itemName={reviewDish}
+      initial={reviewDish ? myRatings[reviewDish] : null}
+      onClose={() => setReviewDish(null)}
+      onSaved={() => {
+        invalidateFunData();
+        load();
+      }}
     />
     </>
   );
@@ -251,5 +279,7 @@ const makeStyles = (colors) => StyleSheet.create({
     borderColor: colors.border,
   },
   dishName: { fontSize: font.md, fontWeight: font.semibold, color: colors.text },
+  reviewLink: { fontSize: font.sm, fontWeight: font.semibold, color: colors.primary },
+  myComment: { fontSize: font.sm, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' },
   tapHint: { fontSize: font.sm, color: colors.textFaint, marginTop: 2 },
 });

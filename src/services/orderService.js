@@ -211,7 +211,7 @@ export async function fetchTodaySummary() {
   const [{ data, error }, { data: menuItems }] = await Promise.all([
     supabase
       .from('today_orders')
-      .select('client, user_id, avatar_url, total, item_name, quantity, line_total, order_id, restaurant_name, revolut_tag, is_paid, for_name, item_is_paid'),
+      .select('client, user_id, avatar_url, total, item_name, quantity, line_total, order_id, restaurant_id, restaurant_name, revolut_tag, is_paid, for_name, item_is_paid'),
     supabase.from('menu_items').select('name, calories').not('calories', 'is', null),
   ]);
   if (error) throw new Error(error.message);
@@ -238,6 +238,7 @@ export async function fetchTodaySummary() {
         total: 0,
         totalCalories: 0,
         orderId: row.order_id,
+        restaurantId: row.restaurant_id,
         restaurantName: row.restaurant_name,
         revolutTag: row.revolut_tag,
         isPaid: row.is_paid,
@@ -247,6 +248,7 @@ export async function fetchTodaySummary() {
       name: row.item_name,
       quantity: row.quantity,
       lineTotal: Number(row.line_total),
+      price: row.quantity ? Number(row.line_total) / row.quantity : Number(row.line_total),
       forName: row.for_name ?? null,
       isPaid: !!row.item_is_paid,
     });
@@ -351,7 +353,7 @@ export async function fetchAllHistory() {
     const { data, error } = await supabase
       .from('orders')
       .select(
-        'id, order_date, total, restaurant_name, created_at, user_id, order_items(item_name, quantity, line_total, for_name)'
+        'id, order_date, total, restaurant_id, restaurant_name, created_at, user_id, order_items(item_name, quantity, line_total, for_name)'
       )
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
@@ -393,6 +395,8 @@ export async function fetchAllHistory() {
         ownerId: o.user_id,
         orderedBy: isProxy ? ownerName : null,
         date: o.order_date,
+        createdAt: o.created_at,
+        restaurantId: o.restaurant_id ?? null,
         total: items.reduce((s, it) => s + Number(it.line_total), 0),
         restaurantName: o.restaurant_name ?? '—',
         userId: eater?.id ?? `name:${key}`,
@@ -403,4 +407,22 @@ export async function fetchAllHistory() {
     });
   });
   return entries;
+}
+
+// How many of each dish have been ordered today at one restaurant — drives
+// the "👑 Хит на деня" crown in the menu.
+export async function fetchTodayDishCounts(restaurantId) {
+  if (!isSupabaseConfigured || !restaurantId) return {};
+  const { data, error } = await supabase
+    .from('today_orders')
+    .select('item_name, quantity, user_id')
+    .eq('restaurant_id', restaurantId);
+  if (error) throw new Error(error.message);
+  const counts = {};
+  (data || []).forEach((r) => {
+    const c = (counts[r.item_name] ??= { quantity: 0, people: new Set() });
+    c.quantity += r.quantity;
+    c.people.add(r.user_id);
+  });
+  return counts;
 }

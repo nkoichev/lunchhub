@@ -14,6 +14,8 @@ import { confirmDialog, alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
 import LogoSpinner from '../components/LogoSpinner';
+import { tapHaptic, successHaptic } from '../utils/haptics';
+import { invalidateFunData } from '../services/funStatsService';
 import ForWhomModal from '../components/ForWhomModal';
 import { useAuth } from '../context/AuthContext';
 import { moveUnits } from '../utils/orderLines';
@@ -55,17 +57,21 @@ export default function EditOrderScreen({ route, navigation }) {
     })();
   }, [orderId]);
 
-  const inc = (index) =>
+  const inc = (index) => {
+    tapHaptic();
     setItems((prev) =>
       prev.map((i, n) => (n === index ? { ...i, quantity: i.quantity + 1 } : i))
     );
+  };
 
-  const dec = (index) =>
+  const dec = (index) => {
+    tapHaptic();
     setItems((prev) =>
       prev
         .map((i, n) => (n === index ? { ...i, quantity: i.quantity - 1 } : i))
         .filter((i) => i.quantity > 0)
     );
+  };
 
   const removeItem = (index) =>
     setItems((prev) => prev.filter((_, n) => n !== index));
@@ -76,6 +82,8 @@ export default function EditOrderScreen({ route, navigation }) {
     setSaving(true);
     try {
       const res = await updateOrder(orderId, items);
+      successHaptic();
+      invalidateFunData();
       alertMessage(
         res.deleted ? 'Изтрито' : 'Запазено',
         res.deleted ? 'Поръчката беше премахната.' : 'Поръчката е обновена.'

@@ -52,16 +52,28 @@ function sofiaDayIndex(): number {
 // directly instead of going through the send-push relay (that relay only
 // exists to work around browser CORS, which doesn't apply here).
 // deno-lint-ignore no-explicit-any
-async function notifyMenuUploaded(supabase: any) {
+// "Днес има боб чорба, мусака и още 8 ястия" — names the soup and a main
+// so the push itself is a teaser, not just "the menu is up".
+function menuTeaser(rows: { name: string; category: string }[]) {
+  const pick = (cat: string) => rows.find((r) => r.category === cat)?.name;
+  const highlights = [pick('soup'), pick('main')].filter(Boolean) as string[];
+  if (!highlights.length) return 'Днешното обедно меню вече е в приложението.';
+  const rest = rows.length - highlights.length;
+  const lower = highlights.map((n) => n.charAt(0).toLowerCase() + n.slice(1));
+  return `Днес има ${lower.join(', ')}${rest > 0 ? ` и още ${rest} ястия` : ''}. Кой е гладен? 😋`;
+}
+
+async function notifyMenuUploaded(supabase: any, rows: { name: string; category: string }[]) {
   try {
     const { data: tokens } = await supabase.from('push_tokens').select('token');
     if (!tokens?.length) return;
 
     const messages = tokens.map((t: { token: string }) => ({
       to: t.token,
-      title: '🍽️ Ново меню от Щастливеца',
-      body: 'Днешното обедно меню вече е в приложението.',
+      title: '🍲 Менюто на Щастливеца е тук!',
+      body: menuTeaser(rows),
       sound: 'default',
+      data: { screen: 'Menu' },
     }));
 
     // Expo caps batches at 100 messages per request.
@@ -184,7 +196,7 @@ Return every item, in the order they appear.`;
     const { error: insertError } = await supabase.from('menu_items').insert(rows);
     if (insertError) throw new Error(insertError.message);
 
-    await notifyMenuUploaded(supabase);
+    await notifyMenuUploaded(supabase, rows);
 
     return new Response(JSON.stringify({ dayIndex, inserted: rows.length, items: rows.map((r) => r.name) }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -5,11 +5,20 @@ import { useAuth } from '../context/AuthContext';
 import { useRestaurant } from '../context/RestaurantContext';
 import { useTheme } from '../context/ThemeContext';
 import { placeOrder } from '../services/orderService';
+import { invalidateFunData } from '../services/funStatsService';
+import { successHaptic, errorHaptic } from '../utils/haptics';
 import { Button, EmptyState } from '../components/ui';
 import ForWhomModal from '../components/ForWhomModal';
 import { alertMessage } from '../utils/confirm';
 import { useResponsive } from '../hooks/useResponsive';
 import { spacing, radius, font, CURRENCY } from '../theme/theme';
+
+const DONE_LINES = [
+  'Поръчката е изпратена. Добър апетит! 😋',
+  'Изпратено! Стомахът ти вече благодари 🙏',
+  'Готово! Сега само чакане и мечти за обяда 🍲',
+  'Поръчката тръгна. Колегите вече завиждат 👀',
+];
 
 export default function CartScreen({ navigation }) {
   const { list, total, incLine, decLine, removeLine, assignLine, clear, count } = useCart();
@@ -25,10 +34,13 @@ export default function CartScreen({ navigation }) {
     setPlacing(true);
     try {
       await placeOrder(user, list, selected);
+      successHaptic();
+      invalidateFunData();
       clear();
-      alertMessage('Готово! 🎉', 'Поръчката е изпратена.');
+      alertMessage('Готово! 🎉', DONE_LINES[Math.floor(Math.random() * DONE_LINES.length)]);
       navigation.navigate('Today');
     } catch (e) {
+      errorHaptic();
       alertMessage('Грешка', e.message);
     } finally {
       setPlacing(false);

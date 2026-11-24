@@ -30,6 +30,7 @@ export function ThemeProvider({ children }) {
     return {
       schemeId,
       setScheme,
+      effect: theme.effect,
       colors: theme.colors,
       shadow: makeShadow(theme.colors),
       themes: THEMES,

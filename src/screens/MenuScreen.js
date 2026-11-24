@@ -11,6 +11,9 @@ import {
   Easing,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase, isSupabaseConfigured } from '../config/supabase';
+import { fetchTodayDishCounts } from '../services/orderService';
+import PopPressable, { useBump } from '../components/PopPressable';
 import { useCart } from '../context/CartContext';
 import { useRestaurant } from '../context/RestaurantContext';
 import { useTheme } from '../context/ThemeContext';
@@ -71,6 +74,50 @@ export default function MenuScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [sortMode, setSortMode] = useState('alpha'); // 'alpha' | 'category'
   const [search, setSearch] = useState('');
+  const [todayCounts, setTodayCounts] = useState({});
+  const [cartScale, bumpCart] = useBump();
+  const prevCount = useRef(count);
+
+  // Bounce the floating cart bar whenever something is added.
+  useEffect(() => {
+    if (count > prevCount.current) bumpCart();
+    prevCount.current = count;
+  }, [count]);
+
+  // "👑 Хит на деня": live counts of what the team ordered today here.
+  const isTodayView = day === todayIndex();
+  const loadTodayCounts = useCallback(async () => {
+    if (!selected?.id) return;
+    try {
+      setTodayCounts(await fetchTodayDishCounts(selected.id));
+    } catch (_) {}
+  }, [selected?.id]);
+
+  useEffect(() => {
+    if (!isTodayView) {
+      setTodayCounts({});
+      return undefined;
+    }
+    loadTodayCounts();
+    if (!isSupabaseConfigured) return undefined;
+    const ch = supabase
+      .channel(`menu-hits-${selected?.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => loadTodayCounts())
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [isTodayView, loadTodayCounts]);
+
+  // The crown goes to the most-ordered dish (needs at least 2 people, so
+  // the first order of the day doesn't crown itself).
+  const hitName = useMemo(() => {
+    const best = Object.entries(todayCounts)
+      .filter(([, c]) => c.people.size >= 2)
+      .sort((a, b) => b[1].quantity - a[1].quantity)[0];
+    return best ? best[0] : null;
+  }, [todayCounts]);
+
   const [menuMode, setMenuMode] = useState('lunch'); // 'lunch' | 'regular'
   const hasRegularMenu = SEPARATE_REGULAR_MENU.has(selected?.id);
 
@@ -170,6 +217,7 @@ export default function MenuScreen({ navigation }) {
   const onRefresh = () => {
     setRefreshing(true);
     load();
+    if (isTodayView) loadTodayCounts();
   };
 
   // Search matches from the start of the dish name (not anywhere inside it).
@@ -217,10 +265,18 @@ export default function MenuScreen({ navigation }) {
 
   const renderDish = (item) => {
     const qty = qtyOf(item.name);
+    const isHit = item.name === hitName;
+    const orderedToday = todayCounts[item.name]?.quantity ?? 0;
     return (
-      <View key={item.id} style={[styles.dish, shadow.card, { width: cardBasis }]}>
+      <View key={item.id} style={[styles.dish, shadow.card, isHit && styles.dishHit, { width: cardBasis }]}>
         <View style={styles.dishMain}>
+          {isHit && (
+            <Text style={styles.hitLabel}>👑 Хит на деня · {orderedToday} поръчки</Text>
+          )}
           <Text style={styles.dishName}>{item.name}</Text>
+          {!isHit && orderedToday > 0 && !isCompact && (
+            <Text style={styles.orderedToday}>🙋 {orderedToday}× поръчано днес</Text>
+          )}
           <View style={styles.dishMeta}>
             <Text style={styles.price}>
               {item.price.toFixed(2)} {CURRENCY}
@@ -238,18 +294,18 @@ export default function MenuScreen({ navigation }) {
         </View>
 
         {qty === 0 ? (
-          <TouchableOpacity style={styles.addBtn} onPress={() => add(item)}>
+          <PopPressable style={styles.addBtn} onPress={() => add(item)} scaleTo={0.8}>
             <Text style={styles.addBtnText}>+</Text>
-          </TouchableOpacity>
+          </PopPressable>
         ) : (
           <View style={styles.stepper}>
-            <TouchableOpacity style={styles.stepBtn} onPress={() => decrement(item.name)}>
+            <PopPressable style={styles.stepBtn} onPress={() => decrement(item.name)} scaleTo={0.75}>
               <Text style={styles.stepText}>−</Text>
-            </TouchableOpacity>
+            </PopPressable>
             <Text style={styles.qty}>{qty}</Text>
-            <TouchableOpacity style={styles.stepBtn} onPress={() => add(item)}>
+            <PopPressable style={styles.stepBtn} onPress={() => add(item)} scaleTo={0.75}>
               <Text style={styles.stepText}>+</Text>
-            </TouchableOpacity>
+            </PopPressable>
           </View>
         )}
       </View>
@@ -426,7 +482,7 @@ export default function MenuScreen({ navigation }) {
 
       {/* Floating cart bar */}
       {count > 0 && (
-        <View style={styles.cartBarWrap} pointerEvents="box-none">
+        <Animated.View style={[styles.cartBarWrap, { transform: [{ scale: cartScale }] }]} pointerEvents="box-none">
           <TouchableOpacity
             style={[styles.cartBar, shadow.floating, { maxWidth, alignSelf: 'center', width: '100%' }]}
             activeOpacity={0.9}
@@ -440,7 +496,7 @@ export default function MenuScreen({ navigation }) {
               {total.toFixed(2)} {CURRENCY}
             </Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       )}
     </View>
   );
@@ -582,6 +638,9 @@ const makeStyles = (colors, scale = 1) => {
     borderColor: colors.border,
   },
   dishMain: { flex: 1, marginRight: spacing.md },
+  dishHit: { borderColor: colors.star, borderWidth: 1.5 },
+  hitLabel: { fontSize: font.xs, fontWeight: font.bold, color: colors.star, marginBottom: 2 },
+  orderedToday: { fontSize: font.xs, color: colors.textFaint, marginTop: 1 },
   dishName: { fontSize: font.md, fontWeight: font.semibold, color: colors.text },
   dishMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: spacing.md },
   price: { fontSize: font.base, fontWeight: font.bold, color: colors.accent },

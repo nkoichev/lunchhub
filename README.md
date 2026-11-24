@@ -21,6 +21,17 @@ This is a redesigned successor to the original Google-Sheets lunch app. It keeps
 | 📝 **Manage tab (dishes & restaurants)** | The "Ястия" tab is the dish catalog (the old *Mandji* sheet). Add, edit and delete dishes, and add new restaurants — all from inside the app, no SQL needed. New restaurants appear as ordering buttons automatically. |
 | 🔄 **Pull to refresh** | Live data everywhere, backed by Supabase realtime. |
 | 👟 **Step tracking** | The last 7 days of step counts are pulled automatically from Android Health Connect on every app open and every time the "Стъпки" tab is focused (plus a manual "refresh" button). No manual entry — the numbers come straight from the phone. Team leaderboard, head-to-head comparison, and personal trend charts. |
+| 🎰 **Payer roulette** | "Кой плаща днес?" can be decided by a slot-machine reel. Odds are weighted so people who paid more often are less likely to be picked; everyone gets a push with the result. |
+| 😂 **Reactions** | React to anyone's order today with 🔥 😂 😋 🤢 💪 (live, and the owner gets a push). |
+| 🍽️ **"Вземи същото"** | Copy a colleague's order into your cart with one tap. |
+| 👑 **Хит на деня** | Today's most-ordered dish gets a crown in the menu, live. |
+| 🏅 **Badges & streaks** | Tap your avatar: 12 badges (soups, explorer, early bird, patron, walked off lunch…), order and step streaks, team ranking. Computed from history, so they apply retroactively. |
+| 🎁 **LunchHub Wrapped** | Story-style monthly or yearly recap: favorite dish, money spent, food twin, calories vs. steps. Can be shared, and a push goes out on the 1st of each month. |
+| 🔥 **Lunch vs. steps** | On "Днес": your lunch calories vs. calories walked off today. |
+| ✍️ **Reviews with photos** | Add a comment and a photo to a dish rating; shown in the rating details. |
+| 🎄 **Seasonal theme** | "Коледа" palette with falling snow. |
+| 📳 **Haptics** | The phone vibrates briefly when you add or remove a dish, place an order, react, or spin the roulette. |
+| ⏰ **Smart pushes** | Menu push names today's soup and main; a reminder goes out 10 min before the cutoff, only to regulars who haven't ordered yet. |
 
 ---
 
@@ -49,6 +60,7 @@ The original app read from Google Sheets via an Apps Script — fragile, hard to
 9. **If you already ran an older `schema.sql`** (before the stray `rls_auto_enable()` function was locked down), also run [`supabase/migration_revoke_rls_auto_enable.sql`](supabase/migration_revoke_rls_auto_enable.sql) once.
 10. **If you already ran an older `schema.sql`** (before automatic step sync from Health Connect), also run [`supabase/migration_steps_source.sql`](supabase/migration_steps_source.sql) once.
 11. **If you already ran an older `schema.sql`** (before Google sign-in), also run [`supabase/migration_google_avatar.sql`](supabase/migration_google_avatar.sql) once.
+12. For the fun features (reactions, review photos, scheduled pushes), run [`supabase/migration_fun_features.sql`](supabase/migration_fun_features.sql) once. Then deploy `lunch-reminder` (`npx supabase functions deploy lunch-reminder --no-verify-jwt`), set its `CRON_SECRET` (and optionally `LUNCH_CUTOFF`, default `11:30`), and uncomment the two `cron.schedule` calls at the end of that file.
 
 **Adding more restaurants:** copy [`supabase/add_restaurant_template.sql`](supabase/add_restaurant_template.sql), fill in the restaurant name and its dishes, and run it. The new restaurant's button appears in the app automatically (pull to refresh). No rebuild needed.
 

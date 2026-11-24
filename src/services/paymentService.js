@@ -70,6 +70,19 @@ export async function markOrderPaid(orderId, isPaid) {
   if (error) throw new Error(error.message);
 }
 
+// How many days each person has been the payer, for the roulette's
+// fairness weighting (and the "Меценат" badge).
+export async function fetchPayerCounts() {
+  if (!isSupabaseConfigured) return {};
+  const { data, error } = await supabase.from('day_payers').select('payer_user_id, order_date');
+  if (error) throw new Error(error.message);
+  const counts = {};
+  (data || []).forEach((r) => {
+    counts[r.payer_user_id] = (counts[r.payer_user_id] ?? 0) + 1;
+  });
+  return counts;
+}
+
 // Mark one colleague's dishes within an order as settled (or not) — for
 // lines someone ordered on their behalf (order_items.for_name).
 export async function markForNamePaid(orderId, forName, isPaid) {

@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Platform, Pressable, Animated, Easing } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { CartProvider, useCart } from './src/context/CartContext';
@@ -14,6 +15,7 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { DensityProvider } from './src/context/DensityContext';
 import AppHeader from './src/components/AppHeader';
 import LogoSpinner from './src/components/LogoSpinner';
+import Snowfall from './src/components/Snowfall';
 
 import LoginScreen from './src/screens/LoginScreen';
 import MenuScreen from './src/screens/MenuScreen';
@@ -24,6 +26,8 @@ import RatingsScreen from './src/screens/RatingsScreen';
 import StepsScreen from './src/screens/StepsScreen';
 import EditOrderScreen from './src/screens/EditOrderScreen';
 import ManageScreen from './src/screens/ManageScreen';
+import AchievementsScreen from './src/screens/AchievementsScreen';
+import WrappedScreen from './src/screens/WrappedScreen';
 
 import { font } from './src/theme/theme';
 
@@ -41,6 +45,18 @@ if (Platform.OS !== 'web') {
 }
 
 const Tab = createBottomTabNavigator();
+const navigationRef = createNavigationContainerRef();
+
+// Pushes carry `data.screen` (see pushService / Edge Functions) — tapping
+// one opens the matching place in the app.
+function openFromNotification(data) {
+  if (!data?.screen || !navigationRef.isReady()) return;
+  try {
+    if (data.screen === 'Wrapped') navigationRef.navigate('Wrapped', { period: data.period ?? 'lastMonth' });
+    else if (data.screen === 'Menu') navigationRef.navigate('Tabs', { screen: 'MenuTab', params: { screen: 'Menu' } });
+    else navigationRef.navigate('Tabs', { screen: data.screen });
+  } catch (_) {}
+}
 const Stack = createNativeStackNavigator();
 
 const TAB_ICON = {
@@ -186,7 +202,7 @@ function MenuStack() {
 
 function MainTabs() {
   const { count } = useCart();
-  const { colors } = useTheme();
+  const { colors, effect } = useTheme();
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <AppHeader />
@@ -208,6 +224,7 @@ function MainTabs() {
         <Tab.Screen name="Manage" component={ManageScreen} options={{ title: 'Ястия' }} />
         <Tab.Screen name="Steps" component={StepsScreen} options={{ title: 'Стъпки' }} />
       </Tab.Navigator>
+      {effect === 'snow' && <Snowfall />}
     </View>
   );
 }
@@ -228,6 +245,20 @@ function RootNavigator() {
           headerStyle: { backgroundColor: colors.surface },
         }}
       />
+      <Stack.Screen
+        name="Achievements"
+        component={AchievementsScreen}
+        options={{
+          title: 'Постижения',
+          headerTintColor: colors.text,
+          headerStyle: { backgroundColor: colors.surface },
+        }}
+      />
+      <Stack.Screen
+        name="Wrapped"
+        component={WrappedScreen}
+        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }}
+      />
     </Stack.Navigator>
   );
 }
@@ -238,6 +269,29 @@ function Gate() {
   const { user, booting } = useAuth();
   const { colors } = useTheme();
 
+  // Notification taps: while running, and the one that cold-started the app.
+  useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
+    const sub = Notifications.addNotificationResponseReceivedListener((r) =>
+      openFromNotification(r?.notification?.request?.content?.data)
+    );
+    return () => sub.remove();
+  }, []);
+
+  const onNavReady = async () => {
+    if (Platform.OS === 'web') return;
+    try {
+      const last = await Notifications.getLastNotificationResponseAsync();
+      const id = last?.notification?.request?.identifier;
+      if (!id) return;
+      // The "last response" survives restarts — only act on it once.
+      const seen = await AsyncStorage.getItem('lunchhub.lastNotificationHandled');
+      if (seen === id) return;
+      await AsyncStorage.setItem('lunchhub.lastNotificationHandled', id);
+      openFromNotification(last.notification.request.content?.data);
+    } catch (_) {}
+  };
+
   if (booting) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
@@ -246,7 +300,11 @@ function Gate() {
     );
   }
 
-  return <NavigationContainer>{user ? <RootNavigator /> : <LoginScreen />}</NavigationContainer>;
+  return (
+    <NavigationContainer ref={navigationRef} onReady={onNavReady}>
+      {user ? <RootNavigator /> : <LoginScreen />}
+    </NavigationContainer>
+  );
 }
 
 function AppShell() {

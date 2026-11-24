@@ -1,9 +1,19 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { supabase, isSupabaseConfigured } from '../config/supabase';
 import { fetchTodaySummary, deleteOrder, todayDateString } from '../services/orderService';
-import { fetchDayPayer, setDayPayer, markOrderPaid, markForNamePaid, fetchPayerCandidates } from '../services/paymentService';
+import { fetchDayPayer, setDayPayer, markOrderPaid, markForNamePaid, fetchPayerCandidates, fetchPayerCounts } from '../services/paymentService';
+import { fetchReactions, toggleReaction } from '../services/reactionService';
+import { notifyRouletteWinner } from '../services/pushService';
+import { fetchStepsForDay } from '../services/stepService';
+import { loadFunData, computeTeamFlair, burnVerdict, invalidateFunData } from '../services/funStatsService';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
+import { useRestaurant } from '../context/RestaurantContext';
+import PayerRouletteModal from '../components/PayerRouletteModal';
+import ReactionBar from '../components/ReactionBar';
+import { mediumHaptic, successHaptic } from '../utils/haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useDensity } from '../context/DensityContext';
 import { EmptyState, Badge } from '../components/ui';
@@ -28,6 +38,20 @@ export default function TodayScreen({ navigation }) {
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [reactions, setReactions] = useState({});
+  const [flair, setFlair] = useState({});
+  const [payerCounts, setPayerCounts] = useState({});
+  const [mySteps, setMySteps] = useState(0);
+  const [rouletteOpen, setRouletteOpen] = useState(false);
+  const { list: cartList, addMany, clear: clearCart } = useCart();
+  const { restaurants, selected, setSelected } = useRestaurant();
+  const orderIdsRef = useRef([]);
+
+  const loadReactions = useCallback(async (ids = orderIdsRef.current) => {
+    try {
+      setReactions(await fetchReactions(ids));
+    } catch (_) {}
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -40,13 +64,33 @@ export default function TodayScreen({ navigation }) {
       setAllUsers(users);
       setGrandTotal(grandTotal);
       setPayerUserId(payer);
+      orderIdsRef.current = people.map((p) => p.orderId);
+      loadReactions(orderIdsRef.current);
     } catch (_) {
       setPeople([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+    // Extras that shouldn't hold up the main list.
+    fetchPayerCounts().then(setPayerCounts).catch(() => {});
+    fetchStepsForDay(user, todayDateString()).then(setMySteps).catch(() => {});
+    loadFunData()
+      .then((d) => setFlair(computeTeamFlair(d)))
+      .catch(() => {});
+  }, [user, loadReactions]);
+
+  // Live reactions: someone taps 🔥 on your order → it shows up right away.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return undefined;
+    const ch = supabase
+      .channel('today-reactions')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_reactions' }, () => loadReactions())
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [loadReactions]);
 
   useFocusEffect(
     useCallback(() => {
@@ -57,7 +101,67 @@ export default function TodayScreen({ navigation }) {
 
   const onRefresh = () => {
     setRefreshing(true);
+    invalidateFunData();
     load();
+  };
+
+  const onReact = async (p, emoji, mine) => {
+    mediumHaptic();
+    // Optimistic toggle so the chip reacts instantly.
+    setReactions((prev) => {
+      const byEmoji = { ...(prev[p.orderId] || {}) };
+      const list = byEmoji[emoji] || [];
+      byEmoji[emoji] = mine
+        ? list.filter((r) => r.userId !== user.id)
+        : [...list, { userId: user.id, name: user.name }];
+      return { ...prev, [p.orderId]: byEmoji };
+    });
+    try {
+      await toggleReaction(user, p.orderId, p.userId, emoji, mine);
+    } catch (e) {
+      alertMessage('Грешка', e.message);
+    }
+    loadReactions();
+  };
+
+  // "Вземи същото" — copy someone's order into my cart (switching to their
+  // restaurant; a cart from another restaurant is cleared after confirming).
+  const onCopyOrder = (p) => {
+    const restaurant = restaurants.find((r) => r.id === p.restaurantId);
+    const doCopy = (clearFirst) => {
+      if (clearFirst) clearCart();
+      if (restaurant) setSelected(restaurant);
+      // Only what they ordered for themselves, not dishes for colleagues.
+      const own = p.items.filter((it) => !it.forName);
+      addMany((own.length ? own : p.items).map((it) => ({ name: it.name, price: it.price, quantity: it.quantity })));
+      navigation.navigate('MenuTab', { screen: 'Cart' });
+    };
+    const differentRestaurant = cartList.length > 0 && restaurant && selected?.id !== restaurant.id;
+    if (differentRestaurant) {
+      confirmDialog({
+        title: 'Смяна на ресторант',
+        message: `Кошницата ви ще бъде изчистена, за да вземете същото като ${p.name}. Продължавате ли?`,
+        confirmText: 'Давай',
+        onConfirm: () => doCopy(true),
+      });
+    } else {
+      doCopy(false);
+    }
+  };
+
+  const onRouletteWinner = async (winner) => {
+    setPayerBusy(true);
+    setPayerUserId(winner.userId);
+    try {
+      await setDayPayer(todayDateString(), winner.userId);
+      successHaptic();
+      notifyRouletteWinner(user, winner.name);
+      load();
+    } catch (e) {
+      alertMessage('Грешка', e.message);
+    } finally {
+      setPayerBusy(false);
+    }
   };
 
   const confirmDelete = (orderId) => {
@@ -160,6 +264,14 @@ export default function TodayScreen({ navigation }) {
   // pay rows), so they're not part of the owner's amount.
   const ownerOwed = (p) =>
     p.items.filter((it) => !it.forName).reduce((s, it) => s + it.lineTotal, 0);
+
+  // Roulette can only land on someone others can actually pay back.
+  const rouletteCandidates = distinctPeople.filter((dp) => dp.revolutTag && !dp.noAccount);
+  // My lunch calories today (the whole of my orders).
+  const myLunchKcal = people
+    .filter((p) => user && p.userId === user.id)
+    .reduce((s, p) => s + (p.totalCalories || 0), 0);
+  const burn = burnVerdict(myLunchKcal, mySteps);
 
   const onPickPayer = async (userId) => {
     const next = payerUserId === userId ? null : userId; // tap again to unset
@@ -298,8 +410,42 @@ export default function TodayScreen({ navigation }) {
             </Text>
           </View>
 
+          {myLunchKcal > 0 && (
+            <View style={[styles.payerCard, shadow.card]}>
+              <Text style={styles.payerLabel}>🔥 Обяд срещу стъпки</Text>
+              <View style={styles.burnRow}>
+                <View style={styles.burnCol}>
+                  <Text style={styles.burnValue}>{myLunchKcal}</Text>
+                  <Text style={styles.burnSub}>ккал обяд</Text>
+                </View>
+                <Text style={styles.burnVs}>vs</Text>
+                <View style={styles.burnCol}>
+                  <Text style={[styles.burnValue, { color: colors.success }]}>~{burn.burned}</Text>
+                  <Text style={styles.burnSub}>ккал от {mySteps.toLocaleString('bg-BG')} стъпки</Text>
+                </View>
+              </View>
+              <View style={styles.burnTrack}>
+                <View
+                  style={[
+                    styles.burnFill,
+                    { width: `${Math.min(100, Math.round(burn.ratio * 100))}%` },
+                    burn.ratio >= 1 && { backgroundColor: colors.success },
+                  ]}
+                />
+              </View>
+              <Text style={styles.burnLine}>{burn.line}</Text>
+            </View>
+          )}
+
           <View style={[styles.payerCard, shadow.card]}>
-            <Text style={styles.payerLabel}>На кого плащаме днес?</Text>
+            <View style={styles.payerHeader}>
+              <Text style={[styles.payerLabel, { marginBottom: 0 }]}>На кого плащаме днес?</Text>
+              {rouletteCandidates.length >= 2 && (
+                <TouchableOpacity style={styles.rouletteBtn} onPress={() => setRouletteOpen(true)} disabled={payerBusy}>
+                  <Text style={styles.rouletteBtnText}>🎰 Рулетка</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.payerChips}>
               {distinctPeople.map((dp) => {
                 const active = dp.userId === payerUserId;
@@ -340,6 +486,12 @@ export default function TodayScreen({ navigation }) {
                       {p.name}
                       {isMe ? '  (аз)' : ''}
                     </Text>
+                    {(flair[p.userId]?.orderStreak >= 2 || flair[p.userId]?.badges?.length > 0) && (
+                      <Text style={styles.flair}>
+                        {flair[p.userId].orderStreak >= 2 ? `🔥 ${flair[p.userId].orderStreak} поред  ` : ''}
+                        {flair[p.userId].badges.join(' ')}
+                      </Text>
+                    )}
                     {p.restaurantName ? (
                       <Text style={styles.personRest}>{p.restaurantName}</Text>
                     ) : null}
@@ -403,6 +555,18 @@ export default function TodayScreen({ navigation }) {
                     </View>
                   ));
                 })()}
+
+                {!isMe && (
+                  <TouchableOpacity style={styles.copyBtn} onPress={() => onCopyOrder(p)}>
+                    <Text style={styles.copyBtnText}>🍽️ Вземи същото</Text>
+                  </TouchableOpacity>
+                )}
+
+                <ReactionBar
+                  reactions={reactions[p.orderId]}
+                  myUserId={user?.id}
+                  onToggle={(emoji, mine) => onReact(p, emoji, mine)}
+                />
 
                 {payerUserId && p.userId === payerUserId && (
                   <View style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}>
@@ -476,6 +640,13 @@ export default function TodayScreen({ navigation }) {
         </>
       )}
       </View>
+      <PayerRouletteModal
+        visible={rouletteOpen}
+        candidates={rouletteCandidates}
+        payerCounts={payerCounts}
+        onClose={() => setRouletteOpen(false)}
+        onWinner={onRouletteWinner}
+      />
     </ScrollView>
   );
 }
@@ -544,6 +715,44 @@ const makeStyles = (colors, scale = 1) => {
     letterSpacing: 0.6,
     marginBottom: spacing.sm,
   },
+  payerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  rouletteBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+  },
+  rouletteBtnText: { fontSize: font.sm, fontWeight: font.bold, color: colors.onPrimary },
+  burnRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
+  burnCol: { alignItems: 'center', flex: 1 },
+  burnValue: { fontSize: font.xl, fontWeight: font.bold, color: colors.accent },
+  burnSub: { fontSize: font.xs, color: colors.textFaint, textAlign: 'center' },
+  burnVs: { fontSize: font.sm, fontWeight: font.bold, color: colors.textFaint },
+  burnTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surfaceAlt,
+    overflow: 'hidden',
+    marginTop: spacing.md,
+  },
+  burnFill: { height: 8, borderRadius: 4, backgroundColor: colors.primary },
+  burnLine: { fontSize: font.sm, color: colors.textMuted, marginTop: spacing.sm, textAlign: 'center' },
+  flair: { fontSize: font.xs, color: colors.textMuted, marginTop: 1 },
+  copyBtn: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  copyBtnText: { fontSize: font.xs, fontWeight: font.semibold, color: colors.primary },
   payerChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   payerChip: {
     flexDirection: 'row',
