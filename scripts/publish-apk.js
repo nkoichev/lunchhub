@@ -68,11 +68,13 @@ async function main() {
   // Poll until the build leaves the in-progress states.
   let status = '';
   let artifactUrl = '';
+  let buildInfo = {};
   for (;;) {
     const infoRaw = sh('eas', ['build:view', buildId, '--json']);
     const info = JSON.parse(infoRaw.trim());
     status = info.status;
     if (status === 'FINISHED') {
+      buildInfo = info;
       artifactUrl = info.artifacts?.buildUrl || info.artifacts?.applicationArchiveUrl;
       break;
     }
@@ -100,6 +102,17 @@ async function main() {
     sh('gh', ['release', 'create', TAG, '--repo', repo, '--title', 'Latest Android build', '--notes', 'Always points at the most recently built APK. Auto-updated by scripts/publish-apk.js.']);
   }
   sh('gh', ['release', 'upload', TAG, `${tmpFile}#${ASSET_NAME}`, '--repo', repo, '--clobber']);
+
+  // The web login screen (src/components/ApkDownloadCard.js) reads the
+  // version and build number from this title via the GitHub API.
+  const version = buildInfo.appVersion || 'unknown';
+  const buildNo = buildInfo.appBuildVersion || '?';
+  const commit = (buildInfo.gitCommitHash || '').slice(0, 7);
+  sh('gh', [
+    'release', 'edit', TAG, '--repo', repo,
+    '--title', `LunchHub ${version} (build ${buildNo})`,
+    '--notes', `Always points at the most recently built APK. Auto-updated by scripts/publish-apk.js.\n\nversion: ${version}\nbuild: ${buildNo}\ncommit: ${commit}\neas build: ${buildId}`,
+  ]);
 
   fs.unlinkSync(tmpFile);
   console.log(`\nDone. Stable install link:\n  https://github.com/${repo}/releases/download/${TAG}/${ASSET_NAME}`);

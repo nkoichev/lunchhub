@@ -15,7 +15,7 @@ export function todayDateString() {
 // already have an order today at the same restaurant, the cart is merged
 // into it (quantities added, new dishes appended) instead of creating a
 // second, separate order for the same person/place/day.
-// cart: [{ name, price, quantity }]
+// cart: [{ name, price, quantity, forName }] — forName null = for the user.
 export async function placeOrder(user, cart, restaurant) {
   if (!cart.length) throw new Error('Кошницата е празна.');
   if (!isSupabaseConfigured) {
@@ -43,16 +43,18 @@ export async function placeOrder(user, cart, restaurant) {
   if (existing) {
     const { data: existingItems } = await supabase
       .from('order_items')
-      .select('id, item_name, quantity')
+      .select('id, item_name, quantity, for_name')
       .eq('order_id', existing.id);
-    const byName = {};
+    // Same dish for a different colleague stays a separate line.
+    const lineKey = (name, forName) => `${name}${forName ?? ''}`;
+    const byKey = {};
     (existingItems || []).forEach((it) => {
-      byName[it.item_name] = it;
+      byKey[lineKey(it.item_name, it.for_name)] = it;
     });
 
     const toInsert = [];
     for (const i of cart) {
-      const match = byName[i.name];
+      const match = byKey[lineKey(i.name, i.forName)];
       if (match) {
         const quantity = match.quantity + i.quantity;
         const { error } = await supabase
@@ -67,6 +69,7 @@ export async function placeOrder(user, cart, restaurant) {
           price: i.price,
           quantity: i.quantity,
           line_total: i.price * i.quantity,
+          for_name: i.forName ?? null,
         });
       }
     }
@@ -113,6 +116,7 @@ export async function placeOrder(user, cart, restaurant) {
       price: i.price,
       quantity: i.quantity,
       line_total: i.price * i.quantity,
+      for_name: i.forName ?? null,
     }));
     const { error: itemsErr } = await supabase.from('order_items').insert(rows);
     if (itemsErr) throw new Error(itemsErr.message);
@@ -130,21 +134,22 @@ export async function fetchOrder(orderId) {
 
   const { data: order, error } = await supabase
     .from('orders')
-    .select('id, order_date, total, restaurant_id, restaurant_name, user_id')
+    .select('id, order_date, total, restaurant_id, restaurant_name, user_id, users!orders_user_id_fkey(name)')
     .eq('id', orderId)
     .single();
   if (error) throw new Error(error.message);
 
   const { data: items } = await supabase
     .from('order_items')
-    .select('item_name, price, quantity, line_total')
+    .select('item_name, price, quantity, line_total, for_name')
     .eq('order_id', orderId);
 
-  return { ...order, items: items || [] };
+  const { users, ...rest } = order;
+  return { ...rest, owner_name: users?.name ?? null, items: items || [] };
 }
 
 // Replace the items of an existing order (edit/correct).
-// items: [{ name, price, quantity }]
+// items: [{ name, price, quantity, forName }]
 export async function updateOrder(orderId, items) {
   if (!isSupabaseConfigured) throw new Error('Базата данни не е настроена.');
   if (!items.length) {
@@ -154,6 +159,15 @@ export async function updateOrder(orderId, items) {
   }
 
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+
+  // Keep colleagues' "paid" flags across the delete + reinsert below.
+  const { data: oldItems } = await supabase
+    .from('order_items')
+    .select('for_name, is_paid')
+    .eq('order_id', orderId);
+  const paidFor = new Set(
+    (oldItems || []).filter((it) => it.for_name && it.is_paid).map((it) => it.for_name)
+  );
 
   // Remove old lines, insert the new set, update the total.
   const { error: delErr } = await supabase
@@ -168,6 +182,8 @@ export async function updateOrder(orderId, items) {
     price: i.price,
     quantity: i.quantity,
     line_total: i.price * i.quantity,
+    for_name: i.forName ?? null,
+    is_paid: !!i.forName && paidFor.has(i.forName),
   }));
   const { error: insErr } = await supabase.from('order_items').insert(rows);
   if (insErr) throw new Error(insErr.message);
@@ -195,7 +211,7 @@ export async function fetchTodaySummary() {
   const [{ data, error }, { data: menuItems }] = await Promise.all([
     supabase
       .from('today_orders')
-      .select('client, user_id, avatar_url, total, item_name, quantity, line_total, order_id, restaurant_id, restaurant_name, revolut_tag, is_paid'),
+      .select('client, user_id, avatar_url, total, item_name, quantity, line_total, order_id, restaurant_id, restaurant_name, revolut_tag, is_paid, for_name, item_is_paid'),
     supabase.from('menu_items').select('name, calories').not('calories', 'is', null),
   ]);
   if (error) throw new Error(error.message);
@@ -233,6 +249,8 @@ export async function fetchTodaySummary() {
       quantity: row.quantity,
       lineTotal: Number(row.line_total),
       price: row.quantity ? Number(row.line_total) / row.quantity : Number(row.line_total),
+      forName: row.for_name ?? null,
+      isPaid: !!row.item_is_paid,
     });
     map[key].total += Number(row.line_total);
     const calories = caloriesByName[row.item_name.trim().toLowerCase()];
@@ -244,39 +262,87 @@ export async function fetchTodaySummary() {
   return { people, grandTotal };
 }
 
-// A user's full order history, newest first.
+// Names to offer in the "for whom" picker: every app user plus anyone
+// typed in by hand on an earlier order, de-duplicated case-insensitively.
+export async function fetchColleagueNames() {
+  if (!isSupabaseConfigured) return [];
+  const [{ data: users }, { data: forNames }] = await Promise.all([
+    supabase.from('users').select('name'),
+    supabase
+      .from('order_items')
+      .select('for_name')
+      .not('for_name', 'is', null)
+      .limit(1000),
+  ]);
+  const seen = new Map();
+  [...(users || []).map((u) => u.name), ...(forNames || []).map((r) => r.for_name)]
+    .filter(Boolean)
+    .forEach((n) => {
+      const key = n.trim().toLowerCase();
+      if (key && !seen.has(key)) seen.set(key, n.trim());
+    });
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+
+// A user's full order history, newest first — the dishes they actually
+// ate: their own orders minus lines ordered for colleagues, plus lines a
+// colleague ordered for them (for_name = their name).
 export async function fetchHistory(user) {
   if (!isSupabaseConfigured) return [];
 
-  const { data: orders, error } = await supabase
-    .from('orders')
-    .select('id, order_date, total, restaurant_id, restaurant_name, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(60);
+  const [{ data: orders, error }, { data: forMe }] = await Promise.all([
+    supabase
+      .from('orders')
+      .select('id, order_date, total, restaurant_id, restaurant_name, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(60),
+    supabase
+      .from('order_items')
+      .select(
+        'order_id, item_name, quantity, line_total, orders!inner(id, order_date, restaurant_id, restaurant_name, created_at)'
+      )
+      .ilike('for_name', user.name)
+      .limit(500),
+  ]);
   if (error) throw new Error(error.message);
-  if (!orders?.length) return [];
-
-  const ids = orders.map((o) => o.id);
-  const { data: items } = await supabase
-    .from('order_items')
-    .select('order_id, item_name, quantity, line_total')
-    .in('order_id', ids);
 
   const byOrder = {};
-  (items || []).forEach((it) => {
-    (byOrder[it.order_id] ??= []).push(it);
+  if (orders?.length) {
+    const { data: items } = await supabase
+      .from('order_items')
+      .select('order_id, item_name, quantity, line_total, for_name')
+      .in('order_id', orders.map((o) => o.id));
+    (items || [])
+      .filter((it) => !it.for_name)
+      .forEach((it) => {
+        (byOrder[it.order_id] ??= []).push(it);
+      });
+  }
+  const own = (orders || [])
+    .map((o) => ({ ...o, items: byOrder[o.id] ?? [] }))
+    .filter((o) => o.items.length);
+
+  const proxied = {};
+  (forMe || []).forEach(({ orders: o, ...it }) => {
+    (proxied[o.id] ??= { ...o, total: 0, items: [] }).items.push(it);
+    proxied[o.id].total += Number(it.line_total);
   });
 
-  return orders.map((o) => ({
-    ...o,
-    items: byOrder[o.id] ?? [],
-  }));
+  return [...own, ...Object.values(proxied)].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at)
+  );
 }
 
 // Everyone's full order history, newest first (for the shared History tab).
 // Fetched in pages because PostgREST caps each response (1000 rows by
 // default); items are embedded so no huge `in(order_id, ...)` list is needed.
+//
+// Each order is split into one entry per person who actually eats from it:
+// lines with a for_name become an entry for that colleague (as if they had
+// ordered themselves, so per-person stats stay real), carrying `orderedBy`
+// so the UI can note who placed it. `id` is unique per entry; `orderId` is
+// the real order (for edit/delete) and `ownerId` the account that placed it.
 const HISTORY_PAGE_SIZE = 1000;
 
 export async function fetchAllHistory() {
@@ -287,7 +353,7 @@ export async function fetchAllHistory() {
     const { data, error } = await supabase
       .from('orders')
       .select(
-        'id, order_date, total, restaurant_id, restaurant_name, created_at, user_id, order_items(item_name, quantity, line_total)'
+        'id, order_date, total, restaurant_id, restaurant_name, created_at, user_id, order_items(item_name, quantity, line_total, for_name)'
       )
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
@@ -298,31 +364,49 @@ export async function fetchAllHistory() {
   }
   if (!orders.length) return [];
 
-  const userIds = [...new Set(orders.map((o) => o.user_id))];
-  const { data: users } = await supabase
-    .from('users')
-    .select('id, name, avatar_url')
-    .in('id', userIds);
+  // All users (not just order owners): a for_name may match someone who
+  // has an account but never ordered on it themselves.
+  const { data: users } = await supabase.from('users').select('id, name, avatar_url');
 
-  const nameById = {};
-  const avatarById = {};
+  const byId = {};
+  const byLowerName = {};
   (users || []).forEach((u) => {
-    nameById[u.id] = u.name;
-    avatarById[u.id] = u.avatar_url ?? null;
+    byId[u.id] = u;
+    byLowerName[u.name.trim().toLowerCase()] = u;
   });
 
-  return orders.map((o) => ({
-    id: o.id,
-    date: o.order_date,
-    createdAt: o.created_at,
-    total: Number(o.total),
-    restaurantId: o.restaurant_id ?? null,
-    restaurantName: o.restaurant_name ?? '—',
-    userId: o.user_id,
-    userName: nameById[o.user_id] ?? '—',
-    userAvatar: avatarById[o.user_id] ?? null,
-    items: o.order_items ?? [],
-  }));
+  const entries = [];
+  orders.forEach((o) => {
+    const owner = byId[o.user_id];
+    const ownerName = owner?.name ?? '—';
+    const groups = new Map();
+    (o.order_items ?? []).forEach((it) => {
+      const forName = it.for_name?.trim() || null;
+      const key = forName ? forName.toLowerCase() : null;
+      if (!groups.has(key)) groups.set(key, { forName, items: [] });
+      groups.get(key).items.push(it);
+    });
+    groups.forEach(({ forName, items }, key) => {
+      const eater = key ? byLowerName[key] : owner;
+      const isProxy = key !== null && eater?.id !== o.user_id;
+      entries.push({
+        id: key === null ? o.id : `${o.id}:${key}`,
+        orderId: o.id,
+        ownerId: o.user_id,
+        orderedBy: isProxy ? ownerName : null,
+        date: o.order_date,
+        createdAt: o.created_at,
+        restaurantId: o.restaurant_id ?? null,
+        total: items.reduce((s, it) => s + Number(it.line_total), 0),
+        restaurantName: o.restaurant_name ?? '—',
+        userId: eater?.id ?? `name:${key}`,
+        userName: eater?.name ?? (forName || ownerName),
+        userAvatar: eater?.avatar_url ?? null,
+        items,
+      });
+    });
+  });
+  return entries;
 }
 
 // How many of each dish have been ordered today at one restaurant — drives

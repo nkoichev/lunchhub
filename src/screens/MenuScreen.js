@@ -8,7 +8,9 @@ import {
   TextInput,
   RefreshControl,
   Animated,
+  Easing,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from '../config/supabase';
 import { fetchTodayDishCounts } from '../services/orderService';
 import PopPressable, { useBump } from '../components/PopPressable';
@@ -38,6 +40,22 @@ function formatUpdatedAt(iso) {
   const date = d.toLocaleDateString('bg-BG', { day: '2-digit', month: '2-digit' });
   return `на ${date} в ${time}`;
 }
+
+// Restaurants whose menu is re-imported automatically every morning
+// (Щастливеца from its email, Lindo from lindo.bg) — see the comment at
+// hasAutoImportedMenu below.
+const AUTO_IMPORTED_RESTAURANTS = new Set(['shtastlivetsa', 'lindo']);
+
+// Restaurants whose everyday dishes (day_index 0) are a separate "regular"
+// menu rather than part of each day's lunch menu: by default only the
+// day's lunch menu is shown, and a toggle switches to the regular one.
+// (Манджата / Малката Верея deliberately mix both into one list.)
+const SEPARATE_REGULAR_MENU = new Set(['lindo']);
+
+// The filters panel (restaurant / day / menu type / search) can be folded
+// away to leave more room for the dishes; the choice is remembered.
+const PANEL_KEY = 'lunchhub.menuPanelCollapsed';
+const PANEL_ANIM_MS = 320;
 
 export default function MenuScreen({ navigation }) {
   const { qtyOf, add, decrement, count, total, clear, list } = useCart();
@@ -100,6 +118,56 @@ export default function MenuScreen({ navigation }) {
     return best ? best[0] : null;
   }, [todayCounts]);
 
+  const [menuMode, setMenuMode] = useState('lunch'); // 'lunch' | 'regular'
+  const hasRegularMenu = SEPARATE_REGULAR_MENU.has(selected?.id);
+
+  // Every restaurant opens on its lunch menu.
+  useEffect(() => setMenuMode('lunch'), [selected?.id]);
+
+  // Collapsible filters panel. Its natural height is measured from the inner
+  // content (which can change: the "regular menu" row, the "updated" line,
+  // a wrapping restaurant row), and the outer view's height is animated
+  // between 0 and that, together with a fade and a slight slide, so it
+  // folds away smoothly instead of jumping.
+  const [collapsed, setCollapsed] = useState(false);
+  const [panelHeight, setPanelHeight] = useState(0);
+  const panelAnim = useRef(new Animated.Value(1)).current; // 1 = open, 0 = folded
+  useEffect(() => {
+    AsyncStorage.getItem(PANEL_KEY)
+      .then((v) => {
+        if (v === '1') {
+          setCollapsed(true);
+          panelAnim.setValue(0);
+        }
+      })
+      .catch(() => {});
+  }, [panelAnim]);
+  const togglePanel = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    Animated.timing(panelAnim, {
+      toValue: next ? 0 : 1,
+      duration: PANEL_ANIM_MS,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: false, // height can't run on the native driver
+    }).start();
+    AsyncStorage.setItem(PANEL_KEY, next ? '1' : '0').catch(() => {});
+  };
+  const panelStyle = panelHeight
+    ? {
+        height: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [0, panelHeight] }),
+        opacity: panelAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0.4, 1] }),
+      }
+    : collapsed
+      ? { height: 0, opacity: 0 } // folded before the first measurement — don't flash it open
+      : null;
+  const panelInnerStyle = {
+    transform: [{ translateY: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
+  };
+  const chevronStyle = {
+    transform: [{ rotate: panelAnim.interpolate({ inputRange: [0, 1], outputRange: ['180deg', '0deg'] }) }],
+  };
+
   // Switching restaurant with a non-empty cart would mix restaurants in one
   // order, so confirm and clear first.
   const onSelectRestaurant = (r) => {
@@ -120,14 +188,24 @@ export default function MenuScreen({ navigation }) {
     }
   };
 
+  // Switching restaurant/day quickly (or the saved restaurant being
+  // restored on startup) can leave an older fetch still in flight; if it
+  // resolves last it would show another restaurant's dishes (and its
+  // "last updated" date) under the newly selected one. Only the latest
+  // request is allowed to update the screen.
+  const requestSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++requestSeq.current;
     try {
-      setItems(await fetchMenu(selected?.id, day));
+      const data = await fetchMenu(selected?.id, day);
+      if (seq === requestSeq.current) setItems(data);
     } catch (e) {
-      setItems([]);
+      if (seq === requestSeq.current) setItems([]);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (seq === requestSeq.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [day, selected?.id]);
 
@@ -143,11 +221,16 @@ export default function MenuScreen({ navigation }) {
   };
 
   // Search matches from the start of the dish name (not anywhere inside it).
+  const shownItems = useMemo(() => {
+    if (!hasRegularMenu) return items;
+    return items.filter((i) => (menuMode === 'regular' ? i.day_index === 0 : i.day_index !== 0));
+  }, [items, hasRegularMenu, menuMode]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLocaleLowerCase('bg');
-    if (!q) return items;
-    return items.filter((i) => i.name.toLocaleLowerCase('bg').startsWith(q));
-  }, [items, search]);
+    if (!q) return shownItems;
+    return shownItems.filter((i) => i.name.toLocaleLowerCase('bg').startsWith(q));
+  }, [shownItems, search]);
 
   const sections = useMemo(() => {
     if (sortMode === 'alpha') {
@@ -167,13 +250,13 @@ export default function MenuScreen({ navigation }) {
   // Freshest import timestamp among the currently shown items — the only
   // way to tell a live menu apart from stale leftover data (see the
   // Щастливеца incident where the daily Gmail→Gemini import silently
-  // failed and nobody could tell from the app). Only Щастливеца has that
-  // daily auto-import; every other restaurant's menu is entered once and
+  // failed and nobody could tell from the app). Only the auto-imported
+  // restaurants have that; every other restaurant's menu is entered once and
   // stays static on purpose, so "last updated" doesn't mean anything there
   // — showing it would just be noise (or a false stale warning).
-  const hasAutoImportedMenu = selected?.id === 'shtastlivetsa';
+  const hasAutoImportedMenu = AUTO_IMPORTED_RESTAURANTS.has(selected?.id);
   const lastUpdated = hasAutoImportedMenu
-    ? items.reduce((max, it) => (it.updated_at && (!max || it.updated_at > max) ? it.updated_at : max), null)
+    ? shownItems.reduce((max, it) => (it.updated_at && (!max || it.updated_at > max) ? it.updated_at : max), null)
     : null;
   // Only flagged as stale when browsing *today's* menu specifically — a
   // future/past weekday's rows are expected to carry an older timestamp,
@@ -231,6 +314,14 @@ export default function MenuScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <Animated.View style={[styles.panel, panelStyle]} pointerEvents={collapsed ? 'none' : 'auto'}>
+      <Animated.View
+        style={panelInnerStyle}
+        onLayout={(e) => {
+          const h = Math.round(e.nativeEvent.layout.height);
+          if (h && h !== panelHeight) setPanelHeight(h);
+        }}
+      >
       {/* Restaurant selector */}
       {restaurants.length > 1 && (
         <View style={styles.barWrap}>
@@ -276,6 +367,25 @@ export default function MenuScreen({ navigation }) {
             );
           })}
         </View>
+        {hasRegularMenu && (
+          <View style={[styles.menuModeBar, centered]}>
+            {[
+              { id: 'lunch', label: '🍽️ Обедно меню' },
+              { id: 'regular', label: '📋 Редовно меню' },
+            ].map((m) => {
+              const active = m.id === menuMode;
+              return (
+                <TouchableOpacity
+                  key={m.id}
+                  onPress={() => setMenuMode(m.id)}
+                  style={[styles.dayChip, active && styles.dayChipActive]}
+                >
+                  <Text style={[styles.dayChipText, active && styles.dayChipTextActive]}>{m.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
         {lastUpdated && (
           <Text style={[styles.updatedText, centered, isStale && styles.updatedTextStale]}>
             {isStale ? '⚠️ Може да не е обновено — ' : ''}Обновено {formatUpdatedAt(lastUpdated)}
@@ -306,6 +416,27 @@ export default function MenuScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </View>
+      </Animated.View>
+      </Animated.View>
+
+      {/* Fold / unfold handle — when folded it also says what is shown */}
+      <TouchableOpacity style={styles.panelHandle} onPress={togglePanel} activeOpacity={0.7}>
+        <View style={[styles.panelHandleRow, centered]}>
+          <Text style={styles.panelHandleText} numberOfLines={1}>
+            {collapsed
+              ? [
+                  selected?.name,
+                  dayName(day),
+                  hasRegularMenu ? (menuMode === 'regular' ? 'Редовно меню' : 'Обедно меню') : null,
+                  search.trim() ? `„${search.trim()}“` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : 'Скрий'}
+          </Text>
+          <Animated.Text style={[styles.panelChevron, chevronStyle]}>▴</Animated.Text>
+        </View>
+      </TouchableOpacity>
 
       {loading ? (
         <View style={styles.center}>
@@ -322,11 +453,19 @@ export default function MenuScreen({ navigation }) {
             {sections.length === 0 ? (
               <EmptyState
                 emoji="📭"
-                title={search ? 'Няма съвпадения' : 'Няма меню за този ден'}
+                title={
+                  search
+                    ? 'Няма съвпадения'
+                    : hasRegularMenu && menuMode === 'lunch'
+                      ? 'Няма обедно меню за този ден'
+                      : 'Няма меню за този ден'
+                }
                 subtitle={
                   search
                     ? 'Опитайте с друго начало на името.'
-                    : 'Опитайте с друг ден или дръпнете надолу за обновяване.'
+                    : hasRegularMenu && menuMode === 'lunch'
+                      ? 'Ресторантът още не го е публикувал — вижте „Редовно меню“ или дръпнете надолу за обновяване.'
+                      : 'Опитайте с друг ден или дръпнете надолу за обновяване.'
                 }
               />
             ) : (
@@ -350,10 +489,10 @@ export default function MenuScreen({ navigation }) {
             onPress={() => navigation.navigate('Cart')}
           >
             <View style={styles.cartBadge}>
-              <Text style={styles.cartBadgeText}>{count}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.cartBadgeText}>{count}</Text>
             </View>
-            <Text style={styles.cartBarText}>Виж поръчката</Text>
-            <Text style={styles.cartBarTotal}>
+            <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.cartBarText}>Виж поръчката</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.cartBarTotal}>
               {total.toFixed(2)} {CURRENCY}
             </Text>
           </TouchableOpacity>
@@ -368,6 +507,22 @@ const makeStyles = (colors, scale = 1) => {
   return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  panel: { overflow: 'hidden', backgroundColor: colors.surface },
+  panelHandle: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+  },
+  panelHandleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    gap: spacing.sm,
+  },
+  panelHandleText: { flexShrink: 1, fontSize: font.xs, fontWeight: font.semibold, color: colors.textFaint },
+  panelChevron: { fontSize: font.sm, color: colors.primary, fontWeight: font.bold },
   barWrap: {
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
@@ -417,6 +572,11 @@ const makeStyles = (colors, scale = 1) => {
     borderRadius: 3,
     backgroundColor: colors.primary,
     marginTop: 3,
+  },
+  menuModeBar: {
+    flexDirection: 'row',
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
   },
   updatedText: {
     fontSize: font.xs,

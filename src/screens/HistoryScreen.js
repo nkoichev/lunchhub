@@ -381,6 +381,9 @@ export default function HistoryScreen({ navigation }) {
                       personOrders.map((o) => (
                         <View key={o.id} style={styles.personOrderBlock}>
                           <Text style={styles.orderRest}>{o.restaurantName}</Text>
+                          {o.orderedBy ? (
+                            <Text style={styles.orderedBy}>🛒 Поръчано от {o.orderedBy}</Text>
+                          ) : null}
                           {o.items.map((it, idx) => (
                             <View key={idx} style={styles.itemRow}>
                               <Text style={styles.itemName}>
@@ -392,17 +395,21 @@ export default function HistoryScreen({ navigation }) {
                               </Text>
                             </View>
                           ))}
-                          {isMe ? (
+                          {user && o.ownerId === user.id ? (
                             <View style={styles.actions}>
                               <TouchableOpacity
                                 style={styles.actionBtn}
-                                onPress={() => navigation.navigate('EditOrder', { orderId: o.id })}
+                                onPress={() => navigation.navigate('EditOrder', { orderId: o.orderId })}
                               >
                                 <Text style={styles.actionText}>✏️ Редактирай</Text>
                               </TouchableOpacity>
-                              <TouchableOpacity style={styles.actionBtn} onPress={() => confirmDelete(o.id)}>
-                                <Text style={[styles.actionText, { color: colors.danger }]}>🗑️ Изтрий</Text>
-                              </TouchableOpacity>
+                              {/* Deleting removes the whole order, colleagues' dishes
+                                  included — only offer it on the orderer's own entry. */}
+                              {!o.orderedBy && (
+                                <TouchableOpacity style={styles.actionBtn} onPress={() => confirmDelete(o.orderId)}>
+                                  <Text style={[styles.actionText, { color: colors.danger }]}>🗑️ Изтрий</Text>
+                                </TouchableOpacity>
+                              )}
                             </View>
                           ) : null}
                         </View>
@@ -615,6 +622,7 @@ const makeStyles = (colors) => StyleSheet.create({
   dayHeaderTotal: { fontSize: font.md, fontWeight: font.bold, color: colors.primary },
 
   orderRest: { fontSize: font.sm, color: colors.primary, fontWeight: font.semibold, marginTop: 1 },
+  orderedBy: { fontSize: font.xs, color: colors.textFaint, fontStyle: 'italic', marginBottom: 2 },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   itemName: { fontSize: font.base, color: colors.textMuted, flex: 1 },
   itemPrice: { fontSize: font.base, color: colors.textMuted },

@@ -5,8 +5,8 @@ import { NavigationContainer, createNavigationContainerRef } from '@react-naviga
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { CartProvider, useCart } from './src/context/CartContext';
@@ -17,9 +17,7 @@ import AppHeader from './src/components/AppHeader';
 import LogoSpinner from './src/components/LogoSpinner';
 import Snowfall from './src/components/Snowfall';
 
-import PinGateScreen from './src/screens/PinGateScreen';
 import LoginScreen from './src/screens/LoginScreen';
-import LinkAccountScreen from './src/screens/LinkAccountScreen';
 import MenuScreen from './src/screens/MenuScreen';
 import CartScreen from './src/screens/CartScreen';
 import TodayScreen from './src/screens/TodayScreen';
@@ -45,8 +43,6 @@ if (Platform.OS !== 'web') {
     }),
   });
 }
-
-const PIN_STORAGE_KEY = 'lunchhub.pinVerified';
 
 const Tab = createBottomTabNavigator();
 const navigationRef = createNavigationContainerRef();
@@ -102,7 +98,10 @@ function AnimatedTabBar({ state, descriptors, navigation, colors }) {
         backgroundColor: colors.surface,
         borderTopWidth: 1,
         borderTopColor: colors.border,
-        height: 62 + insets.bottom,
+        // minHeight, not height: with a large system font (Samsung's default
+        // is bigger than OnePlus') a fixed height let the icons/labels spill
+        // upwards over the screen, covering the floating "Виж поръчката" bar.
+        minHeight: 62 + insets.bottom,
         paddingTop: 6,
         paddingBottom: 8 + insets.bottom,
       }}
@@ -142,7 +141,7 @@ function AnimatedTabBar({ state, descriptors, navigation, colors }) {
             style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
           >
             <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{TAB_ICON[route.name]}</Text>
+              <Text maxFontSizeMultiplier={1.2} style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{TAB_ICON[route.name]}</Text>
               {badge ? (
                 <View
                   style={{
@@ -164,6 +163,7 @@ function AnimatedTabBar({ state, descriptors, navigation, colors }) {
             </View>
             <Text
               numberOfLines={1}
+              maxFontSizeMultiplier={1.3}
               style={{
                 fontSize: 11,
                 fontWeight: font.semibold,
@@ -263,21 +263,11 @@ function RootNavigator() {
   );
 }
 
+// Only a real Supabase session whose email is on the LunchHub list gets in
+// (see AuthContext); everyone else sees the email-code / Google login.
 function Gate() {
-  const { user, booting, pendingProfile } = useAuth();
+  const { user, booting } = useAuth();
   const { colors } = useTheme();
-  const [pinVerified, setPinVerified] = useState(null); // null = still checking
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const v = await AsyncStorage.getItem(PIN_STORAGE_KEY);
-        setPinVerified(v === 'true');
-      } catch (_) {
-        setPinVerified(false);
-      }
-    })();
-  }, []);
 
   // Notification taps: while running, and the one that cold-started the app.
   useEffect(() => {
@@ -302,32 +292,17 @@ function Gate() {
     } catch (_) {}
   };
 
-  const onPinVerified = async () => {
-    try {
-      await AsyncStorage.setItem(PIN_STORAGE_KEY, 'true');
-    } catch (_) {}
-    setPinVerified(true);
-  };
-
-  const spinner = (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
-      <LogoSpinner />
-    </View>
-  );
-
-  if (pinVerified === null) return spinner;
-  if (!pinVerified) return <PinGateScreen onVerified={onPinVerified} />;
-  if (booting) return spinner;
+  if (booting) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
+        <LogoSpinner />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer ref={navigationRef} onReady={onNavReady}>
-      {user ? (
-        <RootNavigator />
-      ) : pendingProfile ? (
-        <LinkAccountScreen />
-      ) : (
-        <LoginScreen />
-      )}
+      {user ? <RootNavigator /> : <LoginScreen />}
     </NavigationContainer>
   );
 }

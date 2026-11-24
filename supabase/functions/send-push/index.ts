@@ -9,14 +9,43 @@
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-import-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+
+// Only signed-in LunchHub members (a session whose confirmed email is on
+// public.allowed_emails, checked by the is_member() RPC) or our own scripts
+// (x-import-secret = IMPORT_SECRET) may call this — the publishable key alone
+// is public, so it's not enough.
+async function isAllowed(req: Request): Promise<boolean> {
+  const secret = Deno.env.get('IMPORT_SECRET');
+  if (secret && req.headers.get('x-import-secret') === secret) return true;
+  const auth = req.headers.get('Authorization') ?? '';
+  if (!auth.startsWith('Bearer ') || auth.length < 40) return false;
+  const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/rpc/is_member`, {
+    method: 'POST',
+    headers: {
+      apikey: req.headers.get('apikey') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Authorization: auth,
+      'Content-Type': 'application/json',
+    },
+    body: '{}',
+  });
+  return res.ok && (await res.json()) === true;
+}
+
+function forbidden(cors: Record<string, string>) {
+  return new Response(JSON.stringify({ error: 'Not a LunchHub member' }), {
+    status: 401,
+    headers: { ...cors, 'Content-Type': 'application/json' },
+  });
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+  if (!(await isAllowed(req))) return forbidden(corsHeaders);
 
   try {
     const messages = await req.json();

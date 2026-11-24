@@ -47,6 +47,7 @@ export const CATEGORY_LABELS = {
   salad: 'Салати',
   main: 'Основни',
   dessert: 'Десерти',
+  side: 'Хляб',
 };
 
-export const CATEGORY_ORDER = ['soup', 'salad', 'main', 'dessert'];
+export const CATEGORY_ORDER = ['soup', 'salad', 'main', 'dessert', 'side'];

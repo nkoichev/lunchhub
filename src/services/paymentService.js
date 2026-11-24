@@ -12,6 +12,17 @@ export async function updateRevolutTag(userId, tag) {
   return clean;
 }
 
+// Every app user with what the "На кого плащаме днес?" picker needs —
+// a colleague someone else ordered for may still be the one who paid.
+export async function fetchPayerCandidates() {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, name, avatar_url, revolut_tag');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 // Who is paying for everyone today (one payer per calendar day).
 export async function fetchDayPayer(dateString) {
   if (!isSupabaseConfigured) return null;
@@ -70,4 +81,16 @@ export async function fetchPayerCounts() {
     counts[r.payer_user_id] = (counts[r.payer_user_id] ?? 0) + 1;
   });
   return counts;
+}
+
+// Mark one colleague's dishes within an order as settled (or not) — for
+// lines someone ordered on their behalf (order_items.for_name).
+export async function markForNamePaid(orderId, forName, isPaid) {
+  if (!isSupabaseConfigured) throw new Error('Базата данни не е настроена.');
+  const { error } = await supabase
+    .from('order_items')
+    .update({ is_paid: isPaid })
+    .eq('order_id', orderId)
+    .eq('for_name', forName);
+  if (error) throw new Error(error.message);
 }

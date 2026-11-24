@@ -87,7 +87,12 @@ create table if not exists public.order_items (
   item_name  text not null,
   price      numeric(6,2) not null default 0,
   quantity   int not null default 1,
-  line_total numeric(8,2) not null default 0
+  line_total numeric(8,2) not null default 0,
+  -- Colleague this dish is for when ordered on someone else's account
+  -- (free text; NULL = for the order's owner).
+  for_name   text,
+  -- Settled with the day's payee (per colleague when ordered for others).
+  is_paid    boolean not null default false
 );
 create index if not exists order_items_order_idx on public.order_items(order_id);
 
@@ -167,7 +172,9 @@ select
   oi.item_name,
   oi.quantity,
   oi.line_total,
-  u.avatar_url
+  u.avatar_url,
+  oi.for_name,
+  oi.is_paid        as item_is_paid
 from public.orders o
 join public.users u        on u.id = o.user_id
 join public.order_items oi on oi.order_id = o.id

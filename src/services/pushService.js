@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { supabase, isSupabaseConfigured, SUPABASE_URL, SUPABASE_ANON_KEY } from '../config/supabase';
+import { supabase, isSupabaseConfigured, SUPABASE_URL, functionHeaders } from '../config/supabase';
 
 const PROJECT_ID = Constants.expoConfig?.extra?.eas?.projectId;
 
@@ -60,12 +60,8 @@ async function relay(messages) {
   if (!messages.length) return;
   await fetch(SEND_PUSH_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-    },
+    // send-push only accepts signed-in LunchHub members (see the function).
+    headers: { ...(await functionHeaders()), Accept: 'application/json' },
     body: JSON.stringify(messages),
   });
 }
@@ -113,8 +109,8 @@ export async function notifyOrderPlaced(orderingUser, restaurantName, cart, tota
 // Roulette result — everyone gets told who's buying.
 export async function notifyRouletteWinner(spinner, winnerName) {
   await pushTo({
-    title: `🎰 Рулетката реши: днес черпи ${winnerName}!`,
-    body: `${spinner.name} завъртя колелото. Сметката отива при ${winnerName} 💸`,
+    title: `🎰 Рулетката реши: днес сметката я плаща ${winnerName}!`,
+    body: `${spinner.name} завъртя колелото. Останалите си връщате дела по Revolut 💸`,
     data: { screen: 'Today' },
   });
 }

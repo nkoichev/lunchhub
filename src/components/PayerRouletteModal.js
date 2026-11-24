@@ -26,7 +26,7 @@ function pickWeighted(weights) {
   return weights.length - 1;
 }
 
-// "Кой плаща днес?" slot machine: a reel of names spins, slows down with a
+// "На кого плащаме днес?" slot machine: a reel of names spins, slows down with a
 // tick on every name, and stops on the (weighted-random) winner.
 export default function PayerRouletteModal({ visible, candidates, payerCounts, onClose, onWinner }) {
   const { colors, shadow } = useTheme();
@@ -93,9 +93,9 @@ export default function PayerRouletteModal({ visible, candidates, payerCounts, o
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={[styles.sheet, shadow.floating]}>
-          <Text style={styles.title}>🎰 Рулетка: кой черпи?</Text>
+          <Text style={styles.title}>🎰 Рулетка: кой плаща сметката?</Text>
           <Text style={styles.subtitle}>
-            Който е плащал по-често, има по-малък шанс — честно е.
+            Който е плащал по-често, има по-малък шанс. Останалите после му връщат по Revolut.
           </Text>
 
           <View style={styles.window}>
@@ -115,7 +115,7 @@ export default function PayerRouletteModal({ visible, candidates, payerCounts, o
           {winner ? (
             <View style={styles.winnerBox}>
               <Text style={styles.winnerEmoji}>🎉</Text>
-              <Text style={styles.winnerText}>Днес черпи {winner.name}!</Text>
+              <Text style={styles.winnerText}>Днес плаща {winner.name}!</Text>
             </View>
           ) : (
             <View style={styles.odds}>

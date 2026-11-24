@@ -64,6 +64,8 @@ The original app read from Google Sheets via an Apps Script — fragile, hard to
 
 **Adding more restaurants:** copy [`supabase/add_restaurant_template.sql`](supabase/add_restaurant_template.sql), fill in the restaurant name and its dishes, and run it. The new restaurant's button appears in the app automatically (pull to refresh). No rebuild needed.
 
+**Lindo (auto-imported from lindo.bg):** the [`import-lindo-menu`](supabase/functions/import-lindo-menu/index.ts) Edge Function reads https://lindo.bg/menu/daily — the weekly specials go to their weekdays, the everyday lunch menu to `day_index 0` (shown every day). [`supabase/migration_lindo.sql`](supabase/migration_lindo.sql) adds the restaurant and a `pg_cron` job (`lunchhub-import-lindo-menu`) that runs it every 30 min on weekday mornings, since Lindo publishes the specials day by day. Deploy with `npx supabase functions deploy import-lindo-menu`; it uses the same `GEMINI_API_KEY` secret for categories/calories of new dishes.
+
 ### 2. Connect the app
 1. In Supabase go to **Project Settings → API** and copy your **Project URL** and **anon public key**.
 2. Open [`app.json`](app.json) and replace the placeholders under `expo.extra`:
@@ -118,6 +120,11 @@ person by name, or the "which of these is you?" picker is shown. On Android
 it signs in through the installed Facebook app (one tap); on web it uses
 Supabase's OAuth redirect.
 
+> **Currently hidden** (`FACEBOOK_LOGIN_ENABLED` in [`LoginScreen.js`](src/screens/LoginScreen.js)):
+> Meta only lets the app go Live after a company-backed Business Verification,
+> and until then only people added as app Testers can sign in. The setup below
+> is complete — flip the flag to bring the button back.
+
 1. **Supabase SQL Editor** → run [`supabase/migration_facebook_auth_link.sql`](supabase/migration_facebook_auth_link.sql) once.
 2. **Meta for Developers** ([developers.facebook.com](https://developers.facebook.com)) → create an app (use case: *Authenticate and request data from users with Facebook Login*):
    - Use cases → Facebook Login → Permissions: make sure **email** and **public_profile** are added.
@@ -150,9 +157,10 @@ The same app can run in a browser (people enter orders from a desktop, no instal
    then press **w** to open it in the browser.
 3. Publish a shareable URL (free EAS Hosting):
    ```bash
-   npx expo export --platform web
-   npx eas deploy
+   npx expo export --platform web --clear
+   npx eas deploy --prod
    ```
+   Keep `--clear`: Metro's build cache is shared between Expo projects on the same machine, and without it a build can pick up another project's `app.json` (its Supabase URL and keys), so the site talks to the wrong database.
    EAS gives you a public link anyone can open.
 
 Notes: the layout is phone-shaped, so on a wide screen it appears as a centered narrow column (functional, not a bespoke desktop design). Confirmation dialogs use the browser's native confirm on web.

@@ -21,9 +21,13 @@ create table if not exists public.order_reactions (
 create index if not exists order_reactions_order_idx on public.order_reactions(order_id);
 
 alter table public.order_reactions enable row level security;
+-- Members only, like every other table (is_member(): confirmed email on
+-- public.allowed_emails).
 drop policy if exists "anon_all_order_reactions" on public.order_reactions;
-create policy "anon_all_order_reactions" on public.order_reactions
-  for all using (true) with check (true);
+drop policy if exists "order_reactions_members" on public.order_reactions;
+create policy "order_reactions_members" on public.order_reactions
+  for all to authenticated
+  using ((select public.is_member())) with check ((select public.is_member()));
 -- Same as the live DB's other tables: signed-in (authenticated) clients only, no anon.
 grant select, insert, update, delete on public.order_reactions to authenticated, service_role;
 
@@ -41,10 +45,10 @@ create policy "dish_photos_read" on storage.objects
   for select using (bucket_id = 'dish-photos');
 drop policy if exists "dish_photos_write" on storage.objects;
 create policy "dish_photos_write" on storage.objects
-  for insert to authenticated with check (bucket_id = 'dish-photos');
+  for insert to authenticated with check (bucket_id = 'dish-photos' and (select public.is_member()));
 drop policy if exists "dish_photos_update" on storage.objects;
 create policy "dish_photos_update" on storage.objects
-  for update to authenticated using (bucket_id = 'dish-photos');
+  for update to authenticated using (bucket_id = 'dish-photos' and (select public.is_member()));
 
 -- ---------- PUSH LOG ----------
 -- The cron job fires every few minutes; this unique key is what makes the
