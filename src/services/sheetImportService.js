@@ -13,6 +13,8 @@ const RESTAURANT_ALIASES = [
   { match: /вере/i, id: 'malkata-vereya' },
   { match: /манджа/i, id: 'mandzhata' },
   { match: /язия|язи/i, id: 'yaziya' },
+  { match: /щастлив/i, id: 'shtastlivetsa' },
+  { match: /lindo|линдо/i, id: 'lindo' },
 ];
 
 function mapRestaurant(raw) {
