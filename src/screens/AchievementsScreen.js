@@ -108,9 +108,11 @@ export default function AchievementsScreen({ navigation }) {
             ['lastMonth', 'Миналия месец'],
             ['thisYear', 'Тази година'],
           ].map(([id, label]) => (
-            <PopPressable key={id} style={[styles.wrappedBtn, shadow.card]} onPress={() => openWrapped(id)}>
-              <Text style={styles.wrappedBtnText}>{label}</Text>
-            </PopPressable>
+            <View key={id} style={{ flex: 1 }}>
+              <PopPressable style={[styles.wrappedBtn, shadow.card]} onPress={() => openWrapped(id)}>
+                <Text style={styles.wrappedBtnText}>{label}</Text>
+              </PopPressable>
+            </View>
           ))}
         </View>
 
@@ -259,8 +261,8 @@ const makeStyles = (colors) =>
     },
     wrappedRow: { flexDirection: 'row', gap: spacing.sm },
     wrappedBtn: {
-      flex: 1,
       alignItems: 'center',
+      paddingHorizontal: spacing.sm,
       paddingVertical: spacing.md,
       borderRadius: radius.md,
       backgroundColor: colors.primary,
