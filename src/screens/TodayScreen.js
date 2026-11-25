@@ -265,8 +265,10 @@ export default function TodayScreen({ navigation }) {
   const ownerOwed = (p) =>
     p.items.filter((it) => !it.forName).reduce((s, it) => s + it.lineTotal, 0);
 
-  // Roulette can only land on someone others can actually pay back.
-  const rouletteCandidates = distinctPeople.filter((dp) => dp.revolutTag && !dp.noAccount);
+  // Roulette includes everyone with an app account (with or without a
+  // Revolut tag — tagless payers get paid back another way). Names typed by
+  // hand without an account can't be stored as the day's payer.
+  const rouletteCandidates = distinctPeople.filter((dp) => !dp.noAccount);
   // My lunch calories today (the whole of my orders).
   const myLunchKcal = people
     .filter((p) => user && p.userId === user.id)

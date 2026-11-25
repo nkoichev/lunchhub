@@ -95,7 +95,7 @@ export default function PayerRouletteModal({ visible, candidates, payerCounts, o
         <View style={[styles.sheet, shadow.floating]}>
           <Text style={styles.title}>🎰 Рулетка: кой плаща сметката?</Text>
           <Text style={styles.subtitle}>
-            Който е плащал по-често, има по-малък шанс. Останалите после му връщат по Revolut.
+            Който е плащал по-често, има по-малък шанс. Останалите после му връщат парите.
           </Text>
 
           <View style={styles.window}>
@@ -132,7 +132,7 @@ export default function PayerRouletteModal({ visible, candidates, payerCounts, o
             <Button title={`💰 Потвърди ${winner.name.split(' ')[0]}`} onPress={confirm} />
           ) : (
             <Button
-              title={spinning ? 'Върти се…' : candidates.length < 2 ? 'Трябват поне двама с Revolut таг' : 'Завърти!'}
+              title={spinning ? 'Върти се…' : candidates.length < 2 ? 'Трябват поне двама' : 'Завърти!'}
               onPress={spin}
               disabled={spinning || candidates.length < 2}
             />
